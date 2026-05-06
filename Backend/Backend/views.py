@@ -1,0 +1,90 @@
+from django.http import JsonResponse
+import json
+import base64
+import os
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from .llm import llama4
+from . import prompt as pr
+from .sheet import fill_sheet
+
+
+def process_image(base64_image, content_type):
+    """
+    Processes the base64 image using LLM and fills the Google Sheet.
+    
+    Args:
+        base64_image (str): Base64 encoded image data.
+        content_type (str): MIME type of the image (e.g., 'image/jpeg').
+    
+    Returns:
+        bool: True if all operations successful, False otherwise.
+    """
+    try:
+        output = json.loads(llama4(pr.OCR_PROMPT, base64_image, content_type))
+        success = True
+        for item in output['items']:
+            temp = {
+                "MONTH": output['MONTH'],
+                "FY": output['FY'],
+                "GR_DATE": output['GR_DATE'],
+                "PARTY_NAME": output['PARTY_NAME'],
+                "PO_NO": output['PO_NO'],
+                "INVOICE_NO": output['INVOICE_NO'],
+                "INVOICE_DATE": output['INVOICE_DATE'],
+                "INTERNAL_REF.": output['INTERNAL_REF.'],
+                "GSTIN/UIN": output['GSTIN/UIN'],
+                "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                "ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK": item['ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK'],
+                "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                "QTY": item['QTY'],
+                "UNIT": item['UNIT'],
+                "ITEM_RATE": item['ITEM_RATE'],
+                "AMOUNT": item['AMOUNT'],
+                "HSN/SAC": item['HSN/SAC'],
+                "CGST": item['CGST'],
+                "SGST": item['SGST'],
+                "IGST": item['IGST'],
+                "TOTAL_TAX": item['TOTAL_TAX'],
+                "TOTAL_AMOUNT": item['TOTAL_AMOUNT']
+            }
+            if not fill_sheet(temp):
+                success = False
+                break  # Stop on first failure, or continue based on requirement
+        return success
+    except Exception as e:
+        print(f"Error in process_image: {e}")
+        return False
+
+@csrf_exempt
+def render(request):
+    """
+    Django view to handle image upload, process with LLM, and fill Google Sheet.
+    
+    Expects POST request with 'file' containing the image.
+    Returns JSON with 'status': 'success' or 'error' message.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+    
+    file = request.FILES['file']
+    
+    try:
+        # Read and encode image
+        image_data = file.read()
+        base64_image = base64.b64encode(image_data).decode('utf-8')
+        content_type = file.content_type
+        
+        # Process image and fill sheet
+        success = process_image(base64_image, content_type)
+        
+        if success:
+            return JsonResponse({'status': 'success'})
+        else:
+            return JsonResponse({'error': 'Failed to process image or fill sheet'}, status=500)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
