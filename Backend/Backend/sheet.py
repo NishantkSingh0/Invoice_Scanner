@@ -6,9 +6,14 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-CREDENTIALS = json.loads(os.getenv('GOOGLE_CREDENTIAL'))
-if not CREDENTIALS:
-    CREDENTIALS = str(Path(__file__).resolve().parent / 'credentials.json')
+GOOGLE_CREDENTIAL = os.getenv('GOOGLE_CREDENTIAL')
+if GOOGLE_CREDENTIAL:
+    try:
+        CREDENTIALS = json.loads(GOOGLE_CREDENTIAL)
+    except (TypeError, json.JSONDecodeError):
+        CREDENTIALS = Path(__file__).resolve().parent / 'credentials.json'
+else:
+    CREDENTIALS = Path(__file__).resolve().parent / 'credentials.json'
 
 
 def fill_sheet(json_data, sheet_name='Sheet1'):
@@ -25,7 +30,10 @@ def fill_sheet(json_data, sheet_name='Sheet1'):
     sheet_id = os.getenv("GOOGLE_SHEET_ID")
     try:
         # Load credentials
-        creds = Credentials.from_service_account_file(CREDENTIALS, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        if isinstance(CREDENTIALS, dict):
+            creds = Credentials.from_service_account_info(CREDENTIALS, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        else:
+            creds = Credentials.from_service_account_file(str(CREDENTIALS), scopes=['https://www.googleapis.com/auth/spreadsheets'])
         
         # Build the service
         service = build('sheets', 'v4', credentials=creds)
