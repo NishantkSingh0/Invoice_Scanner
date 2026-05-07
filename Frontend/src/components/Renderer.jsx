@@ -7,6 +7,7 @@ export default function UploadImage() {
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"
 
   // Handle Upload
@@ -22,7 +23,7 @@ export default function UploadImage() {
   // Open Camera
   const openCamera = () => {
     if (!loading) {
-      fileInputRef.current.click();
+      cameraInputRef.current.click();
     }
   };
 
@@ -71,9 +72,19 @@ export default function UploadImage() {
           Upload or Capture Image
         </h1>
 
-        {/* Hidden Input */}
+        {/* Hidden Input for File Upload */}
         <input
           ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+          disabled={loading}
+        />
+
+        {/* Hidden Input for Camera */}
+        <input
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"
