@@ -30,7 +30,7 @@ def llama4(prompt, base64_image, content_type='image/jpeg'):
             }
         ],
         temperature=1,
-        max_completion_tokens=2048,
+        max_completion_tokens=6000,
         top_p=1,
         stream=False,
         response_format={"type": "json_object"}

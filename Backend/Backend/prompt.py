@@ -64,7 +64,7 @@ Invoice Date / Dated -> "INVOICE_DATE"
 
 Bill From / Sender / Invoice writer -> "VENDOR_NAME"
 
-GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN"
+GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN" (Should be of Vendor)
 
 PO No / Purchase Order No / Pur Order No. -> "PO_NO"
 
@@ -85,11 +85,11 @@ ITEM RULES
 3. Merge multiline descriptions properly.
 4. Freight/service rows should also be included as items.
 5. Preserve exact sequence of rows.
+6. Pay more attention to GSTIN/UIN, INVOICE_NO (as they are crucial for sheet filling).
 
 -----------------------------------
 NULL HANDLING
 -----------------------------------
-
 If field missing:
 "field_name": "NA"        (Only if field is really not present in the document)
 
