@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (user_id, password) => {
     try {
-      const response = await fetch('http://localhost:8000/login/', {
+      const response = await fetch(`${Backend_url}login/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
