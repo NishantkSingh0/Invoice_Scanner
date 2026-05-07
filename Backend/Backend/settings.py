@@ -25,8 +25,11 @@ SECRET_KEY = 'django-insecure-7xru&!4hy-o=#ptygctmivus$=_(qzp)9glm8g0pt-sa-4$3mp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    ".vercel.app",
+    "localhost",
+    "127.0.0.1",
+]
 
 # Application definition
 
@@ -125,6 +128,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    'invoice-scanner-inky.vercel.app',
-    'localhost'
+    "https://invoice-scanner-inky.vercel.app",
+    "http://localhost:5173"
 ]
