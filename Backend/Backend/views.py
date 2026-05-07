@@ -7,6 +7,8 @@ from django.conf import settings
 from .llm import llama4
 from . import prompt as pr
 from .sheet import fill_sheet
+import secrets
+from datetime import datetime, timedelta
 
 
 def process_image(base64_image, content_type):
@@ -86,5 +88,111 @@ def render(request):
         else:
             return JsonResponse({'error': 'Failed to process image or fill sheet'}, status=500)
     
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# Simple in-memory token storage (for production, use database)
+_auth_tokens = {}
+
+def validate_credentials(user_id, password):
+    """
+    Validates user credentials. 
+    Configure valid credentials here or pull from database.
+    """
+    # Example: Simple hardcoded credentials (replace with database lookup in production)
+    VALID_CREDENTIALS = {
+        'userid': os.getenv('EMP_ID'),
+        'password': os.getenv('PASSWORD'),
+    }
+    print(f"Validating credentials for user_id: {user_id}")
+    print(f"Expected password for {user_id}: {VALID_CREDENTIALS.get('password')}")
+    print(f"Provided password for {user_id}: {password}")
+    
+    return user_id == VALID_CREDENTIALS['userid'] and VALID_CREDENTIALS['password'] == password
+
+
+@csrf_exempt
+def login(request):
+    """
+    Authentication endpoint. Accepts POST request with user_id and password.
+    Returns auth token and success status if credentials are valid.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        password = data.get('password')
+        
+        if not user_id or not password:
+            return JsonResponse({'error': 'user_id and password are required'}, status=400)
+        
+        if validate_credentials(user_id, password):
+            # Generate auth token
+            token = secrets.token_urlsafe(32)
+            _auth_tokens[token] = {
+                'user_id': user_id,
+                'created_at': datetime.now(),
+                'expires_at': datetime.now() + timedelta(days=7)
+            }
+            
+            return JsonResponse({
+                'status': 'success',
+                'token': token,
+                'user_id': user_id,
+                'message': 'Login successful'
+            })
+        else:
+            return JsonResponse({
+                'status': 'failed',
+                'error': 'Invalid credentials'
+            }, status=401)
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def verify_token(request):
+    """
+    Verifies if the provided token is valid.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        token = data.get('token')
+        
+        if not token:
+            return JsonResponse({'error': 'token is required'}, status=400)
+        
+        if token in _auth_tokens:
+            token_data = _auth_tokens[token]
+            
+            # Check if token is expired
+            if token_data['expires_at'] < datetime.now():
+                del _auth_tokens[token]
+                return JsonResponse({
+                    'status': 'failed',
+                    'error': 'Token expired'
+                }, status=401)
+            
+            return JsonResponse({
+                'status': 'valid',
+                'user_id': token_data['user_id']
+            })
+        else:
+            return JsonResponse({
+                'status': 'invalid',
+                'error': 'Invalid token'
+            }, status=401)
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
