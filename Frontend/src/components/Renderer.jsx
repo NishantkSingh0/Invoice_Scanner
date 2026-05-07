@@ -7,6 +7,7 @@ export default function UploadImage() {
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
+  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"
 
   // Handle Upload
   const handleFileChange = (e) => {
@@ -35,7 +36,7 @@ export default function UploadImage() {
     formData.append("file", image);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/Render/", {
+      const response = await fetch(`${Backend_url}Render/`, {
         method: "POST",
         body: formData,
       });

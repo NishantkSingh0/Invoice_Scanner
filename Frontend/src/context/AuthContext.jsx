@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null)
   const [userId, setUserId] = useState(null)
   const [loading, setLoading] = useState(true)
-
+  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"
   // Check for existing token in localStorage on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('authToken')
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
 
   const verifyStoredToken = async (storedToken) => {
     try {
-      const response = await fetch('http://localhost:8000/verify-token/', {
+      const response = await fetch(`${Backend_url}verify-token/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
