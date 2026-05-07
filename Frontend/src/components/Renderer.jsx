@@ -7,6 +7,7 @@ export default function UploadImage() {
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"                // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
 
   // Handle Upload
@@ -24,22 +25,14 @@ export default function UploadImage() {
 
   const openFilePicker = () => {
     if (!loading) {
-      const input = fileInputRef.current;
-      if (input) {
-        input.removeAttribute("capture");
-        input.click();
-      }
+      fileInputRef.current?.click();
     }
   };
 
   // Open Camera
   const openCamera = () => {
     if (!loading) {
-      const input = fileInputRef.current;
-      if (input) {
-        input.setAttribute("capture", "environment");
-        input.click();
-      }
+      cameraInputRef.current?.click();
     }
   };
 
@@ -59,7 +52,8 @@ export default function UploadImage() {
       });
 
       if (!response.ok) {
-        throw new Error("Upload Failed");
+        const errorText = await response.text();
+        throw new Error(`Upload Failed: ${errorText}`);
       }
 
       const data = await response.json();
@@ -88,13 +82,31 @@ export default function UploadImage() {
           Upload or Capture Image
         </h1>
 
-        {/* Hidden Input for File Upload / Camera */}
+        {/* Hidden Input for File Upload */}
         <input
           ref={fileInputRef}
           name="file"
           type="file"
           accept="image/*"
           onChange={handleFileChange}
+          onClick={(e) => {
+            e.target.value = null;
+          }}
+          className="hidden"
+          disabled={loading}
+        />
+
+        {/* Hidden Input for Camera */}
+        <input
+          ref={cameraInputRef}
+          name="file"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+          onClick={(e) => {
+            e.target.value = null;
+          }}
           className="hidden"
           disabled={loading}
         />
