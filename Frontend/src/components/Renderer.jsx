@@ -7,23 +7,39 @@ export default function UploadImage() {
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
   const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"                // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
 
   // Handle Upload
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
 
     if (file) {
       setImage(file);
       setPreview(URL.createObjectURL(file));
+    }
+
+    // Reset input value so the same file can be re-selected later
+    e.target.value = "";
+  };
+
+  const openFilePicker = () => {
+    if (!loading) {
+      const input = fileInputRef.current;
+      if (input) {
+        input.removeAttribute("capture");
+        input.click();
+      }
     }
   };
 
   // Open Camera
   const openCamera = () => {
     if (!loading) {
-      cameraInputRef.current.click();
+      const input = fileInputRef.current;
+      if (input) {
+        input.setAttribute("capture", "environment");
+        input.click();
+      }
     }
   };
 
@@ -72,22 +88,12 @@ export default function UploadImage() {
           Upload or Capture Image
         </h1>
 
-        {/* Hidden Input for File Upload */}
+        {/* Hidden Input for File Upload / Camera */}
         <input
           ref={fileInputRef}
+          name="file"
           type="file"
           accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-          disabled={loading}
-        />
-
-        {/* Hidden Input for Camera */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
           onChange={handleFileChange}
           className="hidden"
           disabled={loading}
@@ -97,7 +103,7 @@ export default function UploadImage() {
           {/* Upload */}
           <button
             disabled={loading}
-            onClick={() => fileInputRef.current.click()}
+            onClick={openFilePicker}
             className={`flex-1 py-3 rounded-xl text-white ${
               loading
                 ? "bg-gray-400 cursor-not-allowed"
