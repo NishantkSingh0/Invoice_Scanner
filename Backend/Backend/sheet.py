@@ -9,7 +9,10 @@ load_dotenv()
 GOOGLE_CREDENTIAL = os.getenv('GOOGLE_CREDENTIAL')
 if GOOGLE_CREDENTIAL:
     try:
-        CREDENTIALS = json.loads(GOOGLE_CREDENTIAL)
+        parsed = json.loads(GOOGLE_CREDENTIAL)
+        if isinstance(parsed, dict) and parsed.get('private_key'):
+            parsed['private_key'] = parsed['private_key'].replace('\\n', '\n')
+        CREDENTIALS = parsed
     except (TypeError, json.JSONDecodeError):
         CREDENTIALS = Path(__file__).resolve().parent / 'credentials.json'
 else:
@@ -29,10 +32,17 @@ def fill_sheet(json_data, sheet_name='Sheet1'):
     """
     sheet_id = os.getenv("GOOGLE_SHEET_ID")
     try:
+        if not sheet_id:
+            raise ValueError("GOOGLE_SHEET_ID environment variable is required")
+
         # Load credentials
         if isinstance(CREDENTIALS, dict):
+            if not CREDENTIALS.get('private_key'):
+                raise ValueError('Service account JSON is missing private_key')
             creds = Credentials.from_service_account_info(CREDENTIALS, scopes=['https://www.googleapis.com/auth/spreadsheets'])
         else:
+            if not CREDENTIALS.exists():
+                raise FileNotFoundError(f"Service account credentials file not found: {CREDENTIALS}")
             creds = Credentials.from_service_account_file(str(CREDENTIALS), scopes=['https://www.googleapis.com/auth/spreadsheets'])
         
         # Build the service
