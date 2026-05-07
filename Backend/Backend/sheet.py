@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-if not CREDENTIALS_PATH:
-    CREDENTIALS_PATH = Path(__file__).resolve().parent / 'credentials.json'
+CREDENTIALS = json.loads(os.getenv('GOOGLE_CREDENTIAL'))
+if not CREDENTIALS:
+    CREDENTIALS = str(Path(__file__).resolve().parent / 'credentials.json')
 
 
 def fill_sheet(json_data, sheet_name='Sheet1'):
@@ -25,7 +25,7 @@ def fill_sheet(json_data, sheet_name='Sheet1'):
     sheet_id = os.getenv("GOOGLE_SHEET_ID")
     try:
         # Load credentials
-        creds = Credentials.from_service_account_file(str(CREDENTIALS_PATH), scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        creds = Credentials.from_service_account_file(CREDENTIALS, scopes=['https://www.googleapis.com/auth/spreadsheets'])
         
         # Build the service
         service = build('sheets', 'v4', credentials=creds)
