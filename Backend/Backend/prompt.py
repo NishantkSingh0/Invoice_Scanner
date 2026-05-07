@@ -24,12 +24,11 @@ OUTPUT FORMAT
 {
   "MONTH": "Jan/Feb/... (specify)",
   "FY": "",
-  "GR_DATE": "",
-  "PARTY_NAME": "",
+  "VENDOR_NAME": "",
   "PO_NO": "",
   "INVOICE_NO": "",
   "INVOICE_DATE": "",
-  "INTERNAL_REF.": "",
+  "INTERNAL_REF": "",
   "GSTIN/UIN": "",
 
   "items": [
@@ -41,7 +40,7 @@ OUTPUT FORMAT
       "UNIT": "",
       "ITEM_RATE": "",
       "AMOUNT": "",
-      "HSN/SAC": "",
+      "HSN/SAC": "(Accuracy require!)",
       "CGST": "",
       "SGST": "",
       "IGST": "",
@@ -55,25 +54,27 @@ OUTPUT FORMAT
 SMART FIELD MAPPING
 -----------------------------------
 
-Invoice No / Bill No → INVOICE_NO
+"CGST" / "SGST" / "IGST"    (if have common values for all items, put percentage or value to their respective fields)
 
-LEDGER_ACCOUNT -> PURCHASE / FREIGHT INWARD / LABOUR CHARGES / INSURANCE / PACKING / CREDIT NOTE / NA
+Invoice No / Bill No -> "INVOICE_NO"
 
-Invoice Date / Dated → INVOICE_DATE
+"LEDGER_ACCOUNT" -> PURCHASE / FREIGHT INWARD / LABOUR CHARGES / INSURANCE / PACKING / CREDIT NOTE / NA
 
-Bill To / Buyer / Receiver → PARTY_NAME
+Invoice Date / Dated -> "INVOICE_DATE"
 
-GSTIN / GST No / GSTIN-UIN → GSTIN/UIN
+Bill From / Sender / Invoice writer -> "VENDOR_NAME"
 
-PO No / Purchase Order No / Pur Order No → PO_NO
+GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN"
 
-Qty / Quantity → QTY
+PO No / Purchase Order No / Pur Order No. -> "PO_NO"
 
-Rate / Price → ITEM_RATE
+Qty / Quantity -> "QTY"
 
-Amount / Total → AMOUNT
+Rate / Price -> "ITEM_RATE"
 
-HSN / SAC / HSN Code → HSN/SAC
+Amount / Total -> "AMOUNT"
+
+HSN / SAC / HSN Code -> "HSN/SAC"
 
 -----------------------------------
 ITEM RULES
@@ -90,7 +91,7 @@ NULL HANDLING
 -----------------------------------
 
 If field missing:
-"field_name": "NA"
+"field_name": "NA"        (Only if field is really not present in the document)
 
 Never return null.
 Never omit keys.

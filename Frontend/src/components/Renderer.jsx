@@ -8,7 +8,7 @@ export default function UploadImage() {
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"
+  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"                // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
 
   // Handle Upload
   const handleFileChange = (e) => {

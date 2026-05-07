@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null)
   const [userId, setUserId] = useState(null)
   const [loading, setLoading] = useState(true)
-  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"
+  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/"                // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
   // Check for existing token in localStorage on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('authToken')
