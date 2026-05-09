@@ -64,7 +64,7 @@ Invoice Date / Dated -> "INVOICE_DATE"
 
 Bill From / Sender / Invoice writer -> "VENDOR_NAME"
 
-GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN" (Should be of Vendor)
+GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN" (Should be of Vendor, NOT OF `Crafted Oak & Ore private limited`)
 
 PO No / Purchase Order No / Pur Order No. -> "PO_NO"
 

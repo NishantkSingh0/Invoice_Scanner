@@ -44,9 +44,9 @@ def process_image(base64_image, content_type):
                 "ITEM_RATE": item['ITEM_RATE'],
                 "AMOUNT": item['AMOUNT'],
                 "HSN/SAC": item['HSN/SAC'],
-                "CGST": item['CGST'],
-                "SGST": item['SGST'],
-                "IGST": item['IGST'],
+                "CGST": item['CGST'] if item['GSTIN/UIN'].startswith("09") else "NA",
+                "SGST": item['SGST'] if item['GSTIN/UIN'].startswith("09") else "NA",
+                "IGST": f"{item['CGST'] + item['SGST']}" if not item['GSTIN/UIN'].startswith("09") else "NA",
                 "TOTAL_TAX": item['TOTAL_TAX'],
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT']
             }
