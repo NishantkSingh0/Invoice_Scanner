@@ -127,10 +127,21 @@ def extract_bank_transactions(csv_source):
     # Final dataframe
     final_df = pd.DataFrame()
 
-    final_df["Transaction Date"] = df.get("Transaction Date")
-    final_df["Description"] = df.get("Description")
+    # Convert to datetime first
+    transaction_dates = pd.to_datetime(
+        df["Transaction Date"],
+        format="%d-%m-%Y %H:%M:%S",
+        errors="coerce"
+    )
 
-    final_df["Amount"] = (
+    # Month column -> Apr-26
+    final_df["Month"] = transaction_dates.dt.strftime("%b-%y")
+
+    # Date column -> April 1, 2026
+    final_df["Date"] = transaction_dates.dt.strftime("%B %-d, %Y")
+    final_df["Remarks"] = df.get("Description")
+
+    final_df["Amount (Rs.)"] = (
         df.get("Amount", "")
         .astype(str)
         .str.replace(",", "", regex=False)
@@ -142,14 +153,16 @@ def extract_bank_transactions(csv_source):
         .str.replace(",", "", regex=False)
     )
 
-    final_df["Dr / Cr"] = (
-        df.get(amount_drcr_col)
+    final_df["Transection Type"] = (
+        df[amount_drcr_col].apply(
+            lambda x: "Payment" if str(x).strip().upper() == "DR" else "Receipts"
+        )
         if amount_drcr_col
         else ""
     )
 
     # Remove invalid rows
-    final_df = final_df.dropna(subset=["Transaction Date"])
+    final_df = final_df[transaction_dates.notna()]
 
     # Clean values
     final_df = final_df.fillna("")
