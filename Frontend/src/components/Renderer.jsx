@@ -1,5 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function UploadImage() {
   const [image, setImage] = useState(null);
@@ -8,6 +9,7 @@ export default function UploadImage() {
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const navigate = useNavigate()
   const Backend_url = "http://127.0.0.1:8000/"                // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
 
   // Handle Upload
@@ -22,6 +24,13 @@ export default function UploadImage() {
     // Reset input value so the same file can be re-selected later
     e.target.value = "";
   };
+  useEffect(() => {
+  
+    if (!location.state?.key_name) {
+      navigate("/select");
+    }
+  
+  }, []);
 
   const openFilePicker = () => {
     if (!loading) {
@@ -45,6 +54,10 @@ export default function UploadImage() {
     const formData = new FormData();
     formData.append("file", image);
 
+    formData.append(
+      "KeyName",
+      location.state?.key_name || ""
+    );
     try {
       const response = await fetch(`${Backend_url}Render/`, {
         method: "POST",

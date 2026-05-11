@@ -4,15 +4,15 @@ import base64
 import os
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from .llm import llama4
+from .llm import llama4, extract_bank_transactions
 from . import prompt as pr
-from .sheet import fill_sheet
+from .sheet import fill_sheet, fill_sheet_bulk
 import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
 
-def process_image(base64_image, content_type):
+def process_purchase_image(base64_image, content_type, SheetID):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
     
@@ -31,7 +31,7 @@ def process_image(base64_image, content_type):
             raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
         output = json.loads(llm_response)
         assert output != "unable to parse", "Unable to parse invoice"
-        print("Parsing Succeed",output)
+        # print("Parsing Succeed",output)
         success = True
         for item in output['items']:
             temp = {
@@ -59,7 +59,7 @@ def process_image(base64_image, content_type):
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url
             }
-            if not fill_sheet(temp):
+            if not fill_sheet_bulk(temp, SheetID=SheetID):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -67,8 +67,76 @@ def process_image(base64_image, content_type):
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message
 
+
+def process_bank_csv(base64_image, content_type, SheetID):
+
+    try:
+        data=extract_bank_transactions(csv_file)
+        return fill_sheet_bulk(temp, SheetID=SheetID)
+
+    except Exception as e:
+        print(f"Error in process_image: {e}")
+        raise  # Re-raise so the view can return a meaningful error message
+
+
+def process_sales_image(base64_image, content_type, SheetID):
+    """
+    Processes the base64 image using LLM and fills the Google Sheet.
+    
+    Args:
+        base64_image (str): Base64 encoded image data.
+        content_type (str): MIME type of the image (e.g., 'image/jpeg').
+    
+    Returns:
+        bool: True if all operations successful, False otherwise.
+    """
+    try:
+        url=bucket(base64_string=base64_image)
+        # print("Scceed Url: ", url)
+        llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
+        if llm_response == "unable to parse":
+            raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
+        output = json.loads(llm_response)
+        assert output != "unable to parse", "Unable to parse invoice"
+        # print("Parsing Succeed",output)
+        success = True
+        for item in output['items']:
+            temp = {
+                "MONTH": output['MONTH'],
+                "FY": output['FY'],
+                "GR_DATE": output['MONTH'],
+                "VENDOR_NAME": output['VENDOR_NAME'],
+                "PO_NO": output['PO_NO'],
+                "INVOICE_NO": output['INVOICE_NO'],
+                "INVOICE_DATE": output['INVOICE_DATE'],
+                "INTERNAL_REF": output['INTERNAL_REF'],
+                "GSTIN/UIN": output['GSTIN/UIN'],
+                "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                "ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK": item['ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK'],
+                "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                "QTY": item['QTY'],
+                "UNIT": item['UNIT'],
+                "ITEM_RATE": item['ITEM_RATE'],
+                "AMOUNT": item['AMOUNT'],
+                "HSN/SAC": item['HSN/SAC'],
+                "CGST": item['CGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
+                "SGST": item['SGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
+                "IGST": f"{item['CGST'] + item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
+                "TOTAL_TAX": item['TOTAL_TAX'],
+                "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
+                "INVOICE_IMAGE": url
+            }
+            if not fill_sheet(temp, SheetID=SheetID):
+                success = False
+                break  # Stop on first failure, or continue based on requirement
+        return success
+    except Exception as e:
+        print(f"Error in process_image: {e}")
+        raise  # Re-raise so the view can return a meaningful error message
+
+
 @csrf_exempt
-def render(request):
+def render_csv(request):
     """
     Django view to handle image upload, process with LLM, and fill Google Sheet.
     
@@ -88,9 +156,47 @@ def render(request):
         image_data = file.read()
         base64_image = base64.b64encode(image_data).decode('utf-8')
         content_type = file.content_type
+        success = process_bank_csv(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_BANK'))
+        
+        if success:
+            return JsonResponse({'status': 'success'})
+        else:
+            return JsonResponse({'error': 'Failed to process image or fill sheet'}, status=500)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def render(request):
+    """
+    Django view to handle image upload, process with LLM, and fill Google Sheet.
+    
+    Expects POST request with 'file' containing the image.
+    Returns JSON with 'status': 'success' or 'error' message.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+    
+    file = request.FILES['file']
+    key_name = request.POST.get("KeyName")
+    
+    try:
+        # Read and encode image
+        image_data = file.read()
+        base64_image = base64.b64encode(image_data).decode('utf-8')
+        content_type = file.content_type
         
         # Process image and fill sheet
-        success = process_image(base64_image, content_type)
+        if key_name=="purchase":
+            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'))
+        elif key_name=="sales":
+            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'))
+        else:
+            return JsonResponse({'error': 'Wrong KeyName provided'}, status=500)
         
         if success:
             return JsonResponse({'status': 'success'})
