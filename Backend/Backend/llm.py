@@ -1,5 +1,6 @@
 from groq import Groq
 from dotenv import load_dotenv
+import io
 import os
 import pandas as pd
 load_dotenv()
@@ -75,14 +76,24 @@ def llama4(prompt, base64_image, content_type='image/jpeg'):
 
 
 
-def extract_bank_transactions(csv_file):
-    # Read raw file
-    with open(csv_file, "r", encoding="utf-8", errors="ignore") as f:
-        lines = f.readlines()
+def extract_bank_transactions(csv_source):
+    """
+    Parse bank statement CSV from either a file path or an in-memory BytesIO buffer.
+    No temporary files are written to disk.
+    """
+    # Normalise input — always work with a decoded text buffer
+    if isinstance(csv_source, (str, bytes.__class__)):
+        # File path string
+        with open(csv_source, "r", encoding="utf-8", errors="ignore") as f:
+            raw_text = f.read()
+    else:
+        # BytesIO / file-like object
+        raw_text = csv_source.read().decode("utf-8", errors="ignore")
+
+    lines = raw_text.splitlines(keepends=True)
 
     # Find transaction table start
     start_idx = None
-
     for i, line in enumerate(lines):
         if "Sl. No." in line:
             start_idx = i
@@ -91,10 +102,13 @@ def extract_bank_transactions(csv_file):
     if start_idx is None:
         raise ValueError("Transaction table not found")
 
-    # Parse CSV
+    # Build an in-memory text buffer from the relevant lines only
+    csv_text = "".join(lines[start_idx:])
+    text_buffer = io.StringIO(csv_text)
+
+    # Parse with pandas — no file path needed
     df = pd.read_csv(
-        csv_file,
-        skiprows=start_idx,
+        text_buffer,
         engine="python",
         on_bad_lines="skip"
     )

@@ -2,6 +2,7 @@ from django.http import JsonResponse
 import json
 import base64
 import os
+import io
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .llm import llama4, extract_bank_transactions
@@ -59,7 +60,7 @@ def process_purchase_image(base64_image, content_type, SheetID):
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url
             }
-            if not fill_sheet_bulk(temp, SheetID=SheetID):
+            if not fill_sheet_bulk([temp], SheetID=SheetID):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -68,15 +69,30 @@ def process_purchase_image(base64_image, content_type, SheetID):
         raise  # Re-raise so the view can return a meaningful error message
 
 
-def process_bank_csv(base64_image, content_type, SheetID):
+def process_bank_csv(file_bytes, SheetID):
+    """
+    Processes a bank statement CSV file and bulk-fills the Google Sheet.
 
+    Args:
+        file_bytes (bytes): Raw bytes of the uploaded CSV file.
+        SheetID (str): Target Google Sheet ID.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     try:
-        data=extract_bank_transactions(csv_file)
-        return fill_sheet_bulk(temp, SheetID=SheetID)
+        # Wrap bytes in an in-memory buffer — no disk I/O, no temp files
+        buffer = io.BytesIO(file_bytes)
+        records = extract_bank_transactions(buffer)
+
+        if not records:
+            raise ValueError("No transaction records extracted from CSV")
+
+        return fill_sheet_bulk(records, SheetID=SheetID)
 
     except Exception as e:
-        print(f"Error in process_image: {e}")
-        raise  # Re-raise so the view can return a meaningful error message
+        print(f"Error in process_bank_csv: {e}")
+        raise
 
 
 def process_sales_image(base64_image, content_type, SheetID):
@@ -138,31 +154,32 @@ def process_sales_image(base64_image, content_type, SheetID):
 @csrf_exempt
 def render_csv(request):
     """
-    Django view to handle image upload, process with LLM, and fill Google Sheet.
-    
-    Expects POST request with 'file' containing the image.
-    Returns JSON with 'status': 'success' or 'error' message.
+    Django view to handle CSV upload, extract bank transactions, and bulk-fill Google Sheet.
+
+    Expects POST request with 'file' containing the CSV.
+    Returns JSON with 'status': 'success' or an error message.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
     if 'file' not in request.FILES:
         return JsonResponse({'error': 'No file provided'}, status=400)
-    
+
     file = request.FILES['file']
-    
+
+    # Basic content-type guard (browsers may send text/csv or application/octet-stream)
+    if not file.name.lower().endswith('.csv'):
+        return JsonResponse({'error': 'Only CSV files are accepted'}, status=400)
+
     try:
-        # Read and encode image
-        image_data = file.read()
-        base64_image = base64.b64encode(image_data).decode('utf-8')
-        content_type = file.content_type
-        success = process_bank_csv(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_BANK'))
-        
+        file_bytes = file.read()
+        success = process_bank_csv(file_bytes, SheetID=os.getenv('GOOGLE_SHEET_ID_BANK'))
+
         if success:
             return JsonResponse({'status': 'success'})
         else:
-            return JsonResponse({'error': 'Failed to process image or fill sheet'}, status=500)
-    
+            return JsonResponse({'error': 'Failed to process CSV or fill sheet'}, status=500)
+
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
