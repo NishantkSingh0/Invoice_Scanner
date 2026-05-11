@@ -9,6 +9,7 @@ from . import prompt as pr
 from .sheet import fill_sheet
 import secrets
 from datetime import datetime, timedelta
+from .bucketHandling import bucket
 
 
 def process_image(base64_image, content_type):
@@ -23,7 +24,14 @@ def process_image(base64_image, content_type):
         bool: True if all operations successful, False otherwise.
     """
     try:
-        output = json.loads(llama4(pr.OCR_PROMPT, base64_image, content_type))
+        url=bucket(base64_string=base64_image)
+        # print("Scceed Url: ", url)
+        llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
+        if llm_response == "unable to parse":
+            raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
+        output = json.loads(llm_response)
+        assert output != "unable to parse", "Unable to parse invoice"
+        print("Parsing Succeed",output)
         success = True
         for item in output['items']:
             temp = {
@@ -44,11 +52,12 @@ def process_image(base64_image, content_type):
                 "ITEM_RATE": item['ITEM_RATE'],
                 "AMOUNT": item['AMOUNT'],
                 "HSN/SAC": item['HSN/SAC'],
-                "CGST": item['CGST'] if item['GSTIN/UIN'].startswith("09") else "NA",
-                "SGST": item['SGST'] if item['GSTIN/UIN'].startswith("09") else "NA",
-                "IGST": f"{item['CGST'] + item['SGST']}" if not item['GSTIN/UIN'].startswith("09") else "NA",
+                "CGST": item['CGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
+                "SGST": item['SGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
+                "IGST": f"{item['CGST'] + item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
                 "TOTAL_TAX": item['TOTAL_TAX'],
-                "TOTAL_AMOUNT": item['TOTAL_AMOUNT']
+                "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
+                "INVOICE_IMAGE": url
             }
             if not fill_sheet(temp):
                 success = False
@@ -56,7 +65,7 @@ def process_image(base64_image, content_type):
         return success
     except Exception as e:
         print(f"Error in process_image: {e}")
-        return False
+        raise  # Re-raise so the view can return a meaningful error message
 
 @csrf_exempt
 def render(request):
@@ -105,9 +114,9 @@ def validate_credentials(user_id, password):
         'userid': os.getenv('EMP_ID'),
         'password': os.getenv('PASSWORD'),
     }
-    print(f"Validating credentials for user_id: {user_id}")
-    print(f"Expected password for {user_id}: {VALID_CREDENTIALS.get('password')}")
-    print(f"Provided password for {user_id}: {password}")
+    # print(f"Validating credentials for user_id: {user_id}")
+    # print(f"Expected password for {user_id}: {VALID_CREDENTIALS.get('password')}")
+    # print(f"Provided password for {user_id}: {password}")
     
     return user_id == VALID_CREDENTIALS['userid'] and VALID_CREDENTIALS['password'] == password
 
