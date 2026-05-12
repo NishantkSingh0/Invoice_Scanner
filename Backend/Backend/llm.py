@@ -141,11 +141,20 @@ def extract_bank_transactions(csv_source):
     final_df["Date"] = transaction_dates.dt.strftime("%B %-d, %Y")
     final_df["Remarks"] = df.get("Description")
 
-    final_df["Amount (Rs.)"] = (
-        df.get("Amount", "")
+    amounts = (
+        df.get("Amount", 0)
         .astype(str)
         .str.replace(",", "", regex=False)
+        .astype(float)
     )
+
+    if amount_drcr_col:
+        amounts = amounts.where(
+            df[amount_drcr_col].str.strip().str.upper() != "DR",
+            -amounts
+        )
+
+    final_df["Amount (Rs.)"] = amounts
 
     final_df["Balance"] = (
         df.get("Balance", "")
