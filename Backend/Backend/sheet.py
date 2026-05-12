@@ -19,7 +19,7 @@ else:
     CREDENTIALS = Path(__file__).resolve().parent / 'credentials.json'
 
 
-def fill_sheet(json_data, SheetID: str, sheet_name='Sheet1'):
+def fill_sheet(json_data, SheetID: str, sheet_name='Sheet1', header_row=1):
     """
     Fills a Google Sheet with JSON data for one row.
     
@@ -52,7 +52,8 @@ def fill_sheet(json_data, SheetID: str, sheet_name='Sheet1'):
         service = build('sheets', 'v4', credentials=creds)
         
         # Read the header row to get column names
-        header_range = f'{sheet_name}!1:1'
+        header_range = f'{sheet_name}!A{header_row}:ZZ{header_row}'
+        print("Header range: ",header_range)
         result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=header_range).execute()
         headers = result.get('values', [[]])[0]
         
@@ -85,7 +86,7 @@ def fill_sheet(json_data, SheetID: str, sheet_name='Sheet1'):
 
 
 
-def fill_sheet_bulk(json_data_list, SheetID, sheet_name='Sheet1'):
+def fill_sheet_bulk(json_data_list, SheetID, sheet_name='Sheet1', header_row=1):
     """
     Push multiple rows to Google Sheet at once.
 
@@ -119,8 +120,8 @@ def fill_sheet_bulk(json_data_list, SheetID, sheet_name='Sheet1'):
         service = build('sheets', 'v4', credentials=creds)
 
         # Read headers
-        header_range = f'{sheet_name}!1:1'
-
+        header_range = f'{sheet_name}!A{header_row}:ZZ{header_row}'
+        print("Header range: ",header_range)
         result = service.spreadsheets().values().get(
             spreadsheetId=SheetID,
             range=header_range

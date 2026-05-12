@@ -34,7 +34,6 @@ OUTPUT FORMAT
   "items": [
     {
       "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",
-      "ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK": "A Shorted Item name by you (Specify)",
       "LEDGER_ACCOUNT": "",
       "QTY": "",
       "UNIT": "",

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
 
-def process_purchase_image(base64_image, content_type, SheetID):
+def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Sheet1'):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
     
@@ -25,6 +25,7 @@ def process_purchase_image(base64_image, content_type, SheetID):
         bool: True if all operations successful, False otherwise.
     """
     try:
+        print("Processing image")
         url=bucket(base64_string=base64_image)
         # print("Scceed Url: ", url)
         llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
@@ -46,7 +47,6 @@ def process_purchase_image(base64_image, content_type, SheetID):
                 "INTERNAL_REF": output['INTERNAL_REF'],
                 "GSTIN/UIN": output['GSTIN/UIN'],
                 "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
-                "ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK": item['ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK'],
                 "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
                 "QTY": item['QTY'],
                 "UNIT": item['UNIT'],
@@ -60,7 +60,8 @@ def process_purchase_image(base64_image, content_type, SheetID):
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url
             }
-            if not fill_sheet_bulk([temp], SheetID=SheetID, sheet_name='Sheet1'):
+            print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
+            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -81,21 +82,22 @@ def process_bank_csv(file_bytes, SheetID):
         bool: True if successful, False otherwise.
     """
     try:
+        print("Processing CSV")
         # Wrap bytes in an in-memory buffer — no disk I/O, no temp files
         buffer = io.BytesIO(file_bytes)
         records = extract_bank_transactions(buffer)
 
         if not records:
             raise ValueError("No transaction records extracted from CSV")
-
-        return fill_sheet_bulk(records, SheetID=SheetID)
+        print("calling fill_sheet_bulk to update Data")
+        return fill_sheet_bulk(records, SheetID=SheetID, sheet_name='Bank', header_row=2)
 
     except Exception as e:
         print(f"Error in process_bank_csv: {e}")
         raise
 
 
-def process_sales_image(base64_image, content_type, SheetID):
+def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
     
@@ -107,6 +109,7 @@ def process_sales_image(base64_image, content_type, SheetID):
         bool: True if all operations successful, False otherwise.
     """
     try:
+        print("Processing image")
         url=bucket(base64_string=base64_image)
         # print("Scceed Url: ", url)
         llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
@@ -128,7 +131,6 @@ def process_sales_image(base64_image, content_type, SheetID):
                 "INTERNAL_REF": output['INTERNAL_REF'],
                 "GSTIN/UIN": output['GSTIN/UIN'],
                 "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
-                "ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK": item['ITEM_DESCRIPTION_AS_PER_CRAFTED_OAK'],
                 "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
                 "QTY": item['QTY'],
                 "UNIT": item['UNIT'],
@@ -142,7 +144,8 @@ def process_sales_image(base64_image, content_type, SheetID):
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url
             }
-            if not fill_sheet(temp, SheetID=SheetID):
+            print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
+            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -192,6 +195,7 @@ def render(request):
     Expects POST request with 'file' containing the image.
     Returns JSON with 'status': 'success' or 'error' message.
     """
+    print("Backend Called! ")
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
@@ -209,9 +213,11 @@ def render(request):
         
         # Process image and fill sheet
         if key_name=="purchase":
+            print("Navigating to Purchase")
             success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="Purchase")
         elif key_name=="sales":
-            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="Sales")
+            print("Navigating to Sales")
+            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="sales")
         else:
             return JsonResponse({'error': 'Wrong KeyName provided'}, status=500)
         
