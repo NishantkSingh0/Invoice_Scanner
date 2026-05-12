@@ -60,7 +60,7 @@ def process_purchase_image(base64_image, content_type, SheetID):
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url
             }
-            if not fill_sheet_bulk([temp], SheetID=SheetID):
+            if not fill_sheet_bulk([temp], SheetID=SheetID, sheet_name='Sheet1'):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -209,9 +209,9 @@ def render(request):
         
         # Process image and fill sheet
         if key_name=="purchase":
-            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'))
+            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="Purchase")
         elif key_name=="sales":
-            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'))
+            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="Sales")
         else:
             return JsonResponse({'error': 'Wrong KeyName provided'}, status=500)
         
