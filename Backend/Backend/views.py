@@ -37,9 +37,9 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
         success = True
         for item in output['items']:
             temp = {
-                "MONTH": output['MONTH'],
-                "FY": output['FY'],
-                "GR_DATE": output['MONTH'],
+                "MONTH": output['INVOICE_DATE'].split("-")[1],
+                "FY": output['INVOICE_DATE'].split("-")[0],
+                "GR_DATE": output['INVOICE_DATE'],
                 "VENDOR_NAME": output['VENDOR_NAME'],
                 "PO_NO": output['PO_NO'],
                 "INVOICE_NO": output['INVOICE_NO'],
@@ -55,7 +55,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
                 "HSN/SAC": item['HSN/SAC'],
                 "CGST": item['CGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
                 "SGST": item['SGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
-                "IGST": f"{item['CGST'] + item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
+                "IGST": f"{item['CGST']} + {item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
                 "TOTAL_TAX": item['TOTAL_TAX'],
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url
@@ -121,9 +121,9 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'
         success = True
         for item in output['items']:
             temp = {
-                "MONTH": output['MONTH'],
-                "FY": output['FY'],
-                "GR_DATE": output['MONTH'],
+                "MONTH": output['INVOICE_DATE'].split("-")[1],
+                "FY": output['INVOICE_DATE'].split("-")[0],
+                "GR_DATE": output['INVOICE_DATE'],
                 "VENDOR_NAME": output['VENDOR_NAME'],
                 "PO_NO": output['PO_NO'],
                 "INVOICE_NO": output['INVOICE_NO'],
@@ -139,7 +139,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'
                 "HSN/SAC": item['HSN/SAC'],
                 "CGST": item['CGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
                 "SGST": item['SGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
-                "IGST": f"{item['CGST'] + item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
+                "IGST": f"{item['CGST']} + {item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
                 "TOTAL_TAX": item['TOTAL_TAX'],
                 "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
                 "INVOICE_IMAGE": url

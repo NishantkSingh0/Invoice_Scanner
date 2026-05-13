@@ -22,8 +22,6 @@ OUTPUT FORMAT
 -----------------------------------
 
 {
-  "MONTH": "Jan/Feb/... (specify)",
-  "FY": "",
   "VENDOR_NAME": "",
   "PO_NO": "",
   "INVOICE_NO": "",
@@ -63,7 +61,7 @@ Invoice Date / Dated -> "INVOICE_DATE"
 
 Bill From / Sender / Invoice writer -> "VENDOR_NAME"
 
-GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN" (Should be of Vendor, NOT OF `Crafted Oak & Ore private limited`)
+GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN" (Should be of Vendor, STRICTLY EXCLUDE GSTIN `09AAMCC1953B1ZS` )
 
 PO No / Purchase Order No / Pur Order No. -> "PO_NO"
 
