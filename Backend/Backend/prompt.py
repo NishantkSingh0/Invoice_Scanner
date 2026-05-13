@@ -53,6 +53,8 @@ SMART FIELD MAPPING
 
 "CGST" / "SGST" / "IGST"    (if have common values for all items, put percentage or value to their respective fields)
 
+"INTERNAL_REF" -> Any internal reference number mentioned in the invoice. (May be written with pencil/handwritten without label. Try to find any such number which can be used as reference for invoice. If not found, return "NA")
+
 Invoice No / Bill No -> "INVOICE_NO"
 
 "LEDGER_ACCOUNT" -> PURCHASE / FREIGHT INWARD / LABOUR CHARGES / INSURANCE / PACKING / CREDIT NOTE / NA
@@ -65,7 +67,9 @@ GSTIN / GST No / GSTIN-UIN -> "GSTIN/UIN" (Should be of Vendor, STRICTLY EXCLUDE
 
 PO No / Purchase Order No / Pur Order No. -> "PO_NO"
 
-Qty / Quantity -> "QTY"
+Qty / Quantity -> "QTY"  (Numbers only.. No Units)
+
+Unit / Units -> "UNIT" (mentioned Unit of products, Eg: PCS, NOS, KG, LTR, SQM, CFT, PKG, BOX, etc)
 
 Rate / Price -> "ITEM_RATE"
 
