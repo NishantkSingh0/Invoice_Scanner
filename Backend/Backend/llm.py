@@ -78,22 +78,26 @@ def llama4(prompt, base64_image, content_type='image/jpeg'):
 
 def extract_bank_transactions(csv_source):
     """
-    Parse bank statement CSV from either a file path or an in-memory BytesIO buffer.
-    No temporary files are written to disk.
+    Parse bank statement CSV from either:
+    - file path
+    - BytesIO / uploaded file object
+
+    Returns sorted transaction records in ascending date order.
+    All rows remain aligned correctly after sorting.
     """
-    # Normalise input — always work with a decoded text buffer
-    if isinstance(csv_source, (str, bytes.__class__)):
-        # File path string
+
+    # Read CSV content
+    if isinstance(csv_source, str):
         with open(csv_source, "r", encoding="utf-8", errors="ignore") as f:
             raw_text = f.read()
     else:
-        # BytesIO / file-like object
         raw_text = csv_source.read().decode("utf-8", errors="ignore")
 
     lines = raw_text.splitlines(keepends=True)
 
     # Find transaction table start
     start_idx = None
+
     for i, line in enumerate(lines):
         if "Sl. No." in line:
             start_idx = i
@@ -102,45 +106,57 @@ def extract_bank_transactions(csv_source):
     if start_idx is None:
         raise ValueError("Transaction table not found")
 
-    # Build an in-memory text buffer from the relevant lines only
+    # Create in-memory CSV
     csv_text = "".join(lines[start_idx:])
     text_buffer = io.StringIO(csv_text)
 
-    # Parse with pandas — no file path needed
+    # Read dataframe
     df = pd.read_csv(
         text_buffer,
         engine="python",
         on_bad_lines="skip"
     )
 
-    # Clean columns
+    # Clean dataframe
     df.columns = [str(col).strip() for col in df.columns]
 
-    # Remove empty rows
+    # Remove fully empty rows
     df = df.dropna(how="all")
 
-    # Detect Dr/Cr columns
+    # Detect Dr/Cr column
     drcr_cols = [c for c in df.columns if "Dr / Cr" in c]
 
-    amount_drcr_col = drcr_cols[0] if len(drcr_cols) > 0 else None
+    amount_drcr_col = drcr_cols[0] if drcr_cols else None
 
-    # Final dataframe
-    final_df = pd.DataFrame()
-
-    # Convert to datetime first
+    # Parse transaction dates
     transaction_dates = pd.to_datetime(
         df["Transaction Date"],
         format="%d-%m-%Y %H:%M:%S",
         errors="coerce"
     )
 
-    # Month column -> Apr-26
+    # Remove invalid dates first
+    valid_mask = transaction_dates.notna()
+
+    df = df[valid_mask].copy()
+    transaction_dates = transaction_dates[valid_mask]
+
+    # Create final dataframe
+    final_df = pd.DataFrame()
+
+    # Keep original datetime for accurate sorting
+    final_df["_sort_date"] = transaction_dates
+
+    # Month -> Apr-26
     final_df["Month"] = transaction_dates.dt.strftime("%b-%y")
 
-    # Date column -> April 1, 2026
+    # Date -> April 1, 2026
     final_df["Date"] = transaction_dates.dt.strftime("%B %-d, %Y")
-    final_df["Remarks"] = df.get("Description")
 
+    # Remarks
+    final_df["Remarks"] = df.get("Description", "")
+
+    # Amount processing
     amounts = (
         df.get("Amount", 0)
         .astype(str)
@@ -148,35 +164,50 @@ def extract_bank_transactions(csv_source):
         .astype(float)
     )
 
+    # Convert DR amounts to negative
     if amount_drcr_col:
         amounts = amounts.where(
-            df[amount_drcr_col].str.strip().str.upper() != "DR",
+            df[amount_drcr_col]
+            .astype(str)
+            .str.strip()
+            .str.upper() != "DR",
             -amounts
         )
 
     final_df["Amount (Rs.)"] = amounts
 
+    # Balance
     final_df["Balance"] = (
         df.get("Balance", "")
         .astype(str)
         .str.replace(",", "", regex=False)
     )
 
-    final_df["Transection Type"] = (
-        df[amount_drcr_col].apply(
-            lambda x: "Payment" if str(x).strip().upper() == "DR" else "Receipts"
+    # Transaction Type
+    if amount_drcr_col:
+        final_df["Transection Type"] = df[amount_drcr_col].apply(
+            lambda x: (
+                "Payment"
+                if str(x).strip().upper() == "DR"
+                else "Receipts"
+            )
         )
-        if amount_drcr_col
-        else ""
+    else:
+        final_df["Transection Type"] = ""
+
+    # Sort by actual datetime
+    final_df = final_df.sort_values(
+        by="_sort_date",
+        ascending=True
     )
 
-    # Remove invalid rows
-    final_df = final_df[transaction_dates.notna()]
+    # Remove helper column
+    final_df = final_df.drop(columns=["_sort_date"])
 
-    # Clean values
+    # Clean NaN values
     final_df = final_df.fillna("")
 
-    # Convert to list of dicts directly usable for Google Sheets
+    # Convert to records
     records = final_df.to_dict(orient="records")
 
     return records
