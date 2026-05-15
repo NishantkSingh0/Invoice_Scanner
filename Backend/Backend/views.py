@@ -2,6 +2,7 @@ from django.http import JsonResponse
 import json
 import base64
 import os
+import fitz  # pymupdf
 import io
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -182,6 +183,101 @@ def render_csv(request):
             return JsonResponse({'status': 'success'})
         else:
             return JsonResponse({'error': 'Failed to process CSV or fill sheet'}, status=500)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def render_pdf(request):
+
+    print("Backend Called!")
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+
+    file = request.FILES['file']
+    key_name = request.POST.get("KeyName")
+
+    try:
+
+        pdf_bytes = file.read()
+
+        # Open PDF from memory
+        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        total_pages = len(pdf_document)
+
+        print(f"Total Pages: {total_pages}")
+
+        all_success = True
+
+        for page_index in range(total_pages):
+
+            print(f"Processing Page {page_index + 1}")
+
+            page = pdf_document.load_page(page_index)
+
+            # Increase quality if needed
+            matrix = fitz.Matrix(2, 2)
+
+            pix = page.get_pixmap(matrix=matrix)
+
+            # Convert page image to bytes
+            image_bytes = pix.tobytes("png")
+
+            # Base64 encode
+            base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+            content_type = "image/png"
+
+            # Process page
+            if key_name == "purchase":
+
+                print("Navigating to Purchase")
+
+                success = process_purchase_image(
+                    base64_image,
+                    content_type,
+                    SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'),
+                    sheet_name="Purchase"
+                )
+
+            elif key_name == "sales":
+
+                print("Navigating to Sales")
+
+                success = process_sales_image(
+                    base64_image,
+                    content_type,
+                    SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'),
+                    sheet_name="sales"
+                )
+
+            else:
+                return JsonResponse(
+                    {'error': 'Wrong KeyName provided'},
+                    status=500
+                )
+
+            if not success:
+                all_success = False
+                print(f"Failed on page {page_index + 1}")
+
+        pdf_document.close()
+
+        if all_success:
+            return JsonResponse({
+                'status': 'success',
+                'pages_processed': total_pages
+            })
+
+        return JsonResponse({
+            'error': 'Some pages failed processing'
+        }, status=500)
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
