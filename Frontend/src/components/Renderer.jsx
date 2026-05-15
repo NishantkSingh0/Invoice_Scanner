@@ -3,131 +3,88 @@ import toast, { Toaster } from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export default function UploadImage() {
-
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
-
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-
   const navigate = useNavigate();
   const location = useLocation();
-
   const key_name = location.state?.key_name;
   const isBank = key_name === "bank";
-
-  const Backend_url ="http://127.0.0.1:8000/";         // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
-
+  const Backend_url ="https://invoice-scanner-7hgz.vercel.app/";         // http://127.0.0.1:8000/      or       https://invoice-scanner-7hgz.vercel.app/
+  
   useEffect(() => {
-
     if (!key_name) {
       navigate("/select");
     }
-
   }, []);
 
   // ── File Selection ──────────────────────────────────────────────────────────
   const handleFileChange = (e) => {
-
     const selected = e.target.files && e.target.files[0];
-
     if (selected) {
-
       setFile(selected);
 
       // CSV → no preview
       if (isBank) {
-
         setPreview(null);
-
       }
-
       // PDF Preview
       else if (selected.type === "application/pdf") {
-
         setPreview("PDF");
-
       }
-
       // Image Preview
       else {
-
         setPreview(URL.createObjectURL(selected));
-
       }
     }
-
     e.target.value = "";
   };
 
   const openFilePicker = () => {
-
     if (!loading) {
       fileInputRef.current?.click();
     }
-
   };
 
   const openCamera = () => {
-
     if (!loading) {
       cameraInputRef.current?.click();
     }
-
   };
 
   // ── Upload ──────────────────────────────────────────────────────────────────
   const handleSend = async () => {
-
     if (!file) return;
-
     setLoading(true);
-
     const formData = new FormData();
-
     formData.append("file", file);
-
     if (!isBank) {
       formData.append("KeyName", key_name || "");
     }
-
     let endpoint = "";
-
     if (isBank) {
-
       endpoint = `${Backend_url}Render-CSV/`;
-
     }
     else if (file.type === "application/pdf") {
-
       endpoint = `${Backend_url}Render-PDF/`;
-
     }
     else {
-
       endpoint = `${Backend_url}Render/`;
-
     }
 
     try {
-
       const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
-
       if (!response.ok) {
-
         const errorText = await response.text();
-
         throw new Error(`Upload Failed: ${errorText}`);
       }
-
       const data = await response.json();
-
       console.log(data);
-
       toast.success(
         isBank
           ? "CSV Uploaded Successfully ✅"
@@ -135,14 +92,10 @@ export default function UploadImage() {
             ? "PDF Uploaded Successfully ✅"
             : "Image Uploaded Successfully ✅"
       );
-
       setFile(null);
       setPreview(null);
-
     } catch (error) {
-
       console.error(error);
-
       toast.error(
         isBank
           ? "Failed To Upload CSV ❌"
