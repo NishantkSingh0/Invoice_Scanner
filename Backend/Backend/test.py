@@ -9,5 +9,5 @@
 # fill_sheet(json_data)
 
 from llm import llama4Test
-
+print("Testing llm with hello text")
 llama4Test()

@@ -2,13 +2,47 @@ from groq import Groq
 from dotenv import load_dotenv
 import io
 import os
+import time
 import pandas as pd
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+import static
 
-def llama4Test(prompt="Hello"):
+GROQ_KEYS = [
+    os.getenv("GROQ_API_KEY1"),
+    os.getenv("GROQ_API_KEY2"),
+    os.getenv("GROQ_API_KEY3"),
+    os.getenv("GROQ_API_KEY4"),
+    os.getenv("GROQ_API_KEY5")
+]
+
+# remove empty keys
+GROQ_KEYS = [k for k in GROQ_KEYS if k]
+
+
+# =========================
+# CREATE CLIENT
+# =========================
+
+def get_client(index):
+    return Groq(api_key=GROQ_KEYS[index])
+
+
+def llama4Test(
+    prompt="Hello",
+    retry_count=0
+):
+
+    if retry_count >= len(GROQ_KEYS):
+        print("All APIs failed")
+        return "Unable to call llama4"
+
+    current_index = static.WorkingAPIIndex
+
     try:
+
+        client = get_client(current_index)
+
         completion = client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[
@@ -28,18 +62,54 @@ def llama4Test(prompt="Hello"):
             stream=False,
         )
 
-        print(completion.choices[0].message.content)
+        print(f"Working API Index: {current_index}")
+
+        result = completion.choices[0].message.content
+
+        print(result)
+
+        return result
 
     except Exception as e:
-        print("Error in reading sheet", str(e))
-        print("Unable to call llama4")
+
+        print(f"API {current_index} Failed:", str(e))
+        # print("current Key: ", GROQ_KEYS[current_index])
+
+        # switch to next API
+        next_index = (current_index + 1) % len(GROQ_KEYS)
+
+        # save working index
+        static.WorkingAPIIndex = next_index
+
+        print(f"Switching to API Index: {next_index}")
+
+        time.sleep(1)
+
+        # recurse
+        return llama4Test(
+            prompt,
+            retry_count + 1
+        )
 
 
 
-def llama4(prompt, base64_image, content_type='image/jpeg'):
+def llama4(
+    prompt,
+    base64_image,
+    content_type='image/jpeg',
+    retry_count=0
+):
+
+    if retry_count >= len(GROQ_KEYS):
+        print("All APIs failed")
+        return "unable to parse"
+
+    current_index = static.WorkingAPIIndex
 
     try:
-        # print("llama Called")
+
+        client = get_client(current_index)
+
         image_data_url = f"data:{content_type};base64,{base64_image}"
 
         completion = client.chat.completions.create(
@@ -67,12 +137,32 @@ def llama4(prompt, base64_image, content_type='image/jpeg'):
             stream=False,
             response_format={"type": "json_object"}
         )
-        # print("parsed successfully")
+
+        print(f"Working API Index: {current_index}")
+
         return completion.choices[0].message.content
 
     except Exception as e:
-        print("Error in reading sheet", str(e))
-        return "unable to parse"
+
+        print(f"API {current_index} Failed:", str(e))
+
+        # move to next API
+        next_index = (current_index + 1) % len(GROQ_KEYS)
+
+        # save new working index
+        static.WorkingAPIIndex = next_index
+
+        print(f"Switching to API Index: {next_index}")
+
+        time.sleep(1)
+
+        # recurse
+        return llama4(
+            prompt,
+            base64_image,
+            content_type,
+            retry_count + 1
+        )
 
 
 
