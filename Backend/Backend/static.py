@@ -1,1 +1,2 @@
-WORKING_API_INDEX=0
+class Static:
+    WORKING_API_INDEX = 0

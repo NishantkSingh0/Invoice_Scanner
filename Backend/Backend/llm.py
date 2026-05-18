@@ -6,7 +6,7 @@ import time
 import pandas as pd
 load_dotenv()
 
-from .static import WORKING_API_INDEX
+from .static import Static
 
 GROQ_KEYS = [
     os.getenv("GROQ_API_KEY1"),
@@ -37,7 +37,7 @@ def llama4Test(
         print("All APIs failed")
         return "Unable to call llama4"
 
-    current_index = WORKING_API_INDEX
+    current_index = Static.WORKING_API_INDEX
 
     try:
 
@@ -79,7 +79,7 @@ def llama4Test(
         next_index = (current_index + 1) % len(GROQ_KEYS)
 
         # save working index
-        WORKING_API_INDEX = next_index
+        Static.WORKING_API_INDEX = next_index
 
         print(f"Switching to API Index: {next_index}")
 
@@ -104,7 +104,7 @@ def llama4(
         print("All APIs failed")
         return "unable to parse"
 
-    current_index = WORKING_API_INDEX
+    current_index = Static.WORKING_API_INDEX
 
     try:
 
@@ -150,7 +150,7 @@ def llama4(
         next_index = (current_index + 1) % len(GROQ_KEYS)
 
         # save new working index
-        WORKING_API_INDEX = next_index
+        Static.WORKING_API_INDEX = next_index
 
         print(f"Switching to API Index: {next_index}")
 
