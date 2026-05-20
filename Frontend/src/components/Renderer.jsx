@@ -19,8 +19,8 @@ export default function UploadImage() {
   const isBank = key_name === "bank";
   const isSalesOrder = key_name === "SalesOrder";
 
-  // const Backend_url = "https://invoice-scanner-7hgz.vercel.app/";        
-  const Backend_url = "http://127.0.0.1:8000/";
+  const Backend_url = "https://invoice-scanner-7hgz.vercel.app/";        
+  // const Backend_url = "http://127.0.0.1:8000/";
 
   useEffect(() => {
 
