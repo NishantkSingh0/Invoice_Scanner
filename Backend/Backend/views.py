@@ -4,9 +4,13 @@ import base64
 import os
 import fitz  # pymupdf
 import io
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .llm import llama4, extract_bank_transactions
+from . import utils as ut
 from . import prompt as pr
 from .sheet import fill_sheet, fill_sheet_bulk
 import secrets
@@ -430,3 +434,106 @@ def verify_token(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    
+
+@api_view(["POST"])
+def upload_excel(request):
+
+    try:
+
+        # Get uploaded file
+        excel_file = request.FILES.get("file")
+
+        if not excel_file:
+
+            return Response(
+                {
+                    "success": False,
+                    "message": "No file uploaded"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Read fully in RAM
+        file_bytes = io.BytesIO(
+            excel_file.read()
+        )
+
+        # Parse Excel
+        parsed_data = ut.process_excel(
+            file_path=file_bytes
+        )
+
+        all_success = True
+
+        for i in range(len(parsed_data)):
+
+            # print(
+            #     f"\nParsed Data for Sheet: "
+            #     f"{parsed_data[i]['sheet_name']}"
+            # )
+
+            # print(
+            #     "Metadata:",
+            #     parsed_data[i]['metadata']
+            # )
+
+            # print("Table Data:")
+
+            # print(
+            #     parsed_data[i]['table_data']
+            # )
+
+            # Process SINGLE sheet
+            processedData = ut.RefineSalesOrderData(
+                parsed_data[i]
+            )
+
+            # Write to Google Sheet
+            is_success = fill_sheet_bulk(
+                processedData,
+                SheetID=os.getenv(
+                    "GOOGLE_SHEET_ID_SALES_ORDER"
+                ),
+                header_row=8
+            )
+
+            print(
+                f"Sheet {i} write success: "
+                f"{is_success}"
+            )
+
+            if not is_success:
+                all_success = False
+
+        # FINAL SUCCESS
+        if all_success:
+
+            return Response(
+                {
+                    "success": True,
+                    "message":
+                        "Sales Order Uploaded Successfully"
+                },
+                status=status.HTTP_200_OK
+            )
+
+        # PARTIAL FAILURE
+        return Response(
+            {
+                "success": False,
+                "message":
+                    "Some sheets failed to upload"
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    except Exception as e:
+
+        return Response(
+            {
+                "success": False,
+                "message": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

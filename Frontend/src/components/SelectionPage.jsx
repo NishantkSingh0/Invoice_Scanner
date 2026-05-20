@@ -9,6 +9,12 @@ export default function SelectionPage() {
 
   const options = [
     {
+      id: 'SalesOrder',
+      title: 'SalesOrder',
+      description: 'Analyze Sales XLSX files',
+      color: 'bg-blue-500 hover:bg-blue-600'
+    },
+    {
       id: 'bank',
       title: 'Bank Statement',
       description: 'Process and analyze bank statements',
