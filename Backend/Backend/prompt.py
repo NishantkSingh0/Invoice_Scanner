@@ -34,7 +34,6 @@ SMART FIELD MAPPING
       CGST = IGST% / 2
       SGST = IGST% / 2
 - The Product Description Should be 100% Same as mentioned in Invoice.
-- “Invoice No” can be written as `Bill no.` or something similar.. Accurately Focus on complete text
 - "LEDGER_ACCOUNT" -> PURCHASE / FREIGHT INWARD / LABOUR CHARGES / INSURANCE / PACKING / CREDIT NOTE / NA
 - “Purchase Order No” can be written as `PO No`, `Purchase Order No`, `Pur Order No.`, `PO_NO` or something similar
 - "ITEM_RATE" can be written as Rate, Price, or something similar

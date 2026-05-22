@@ -4,6 +4,10 @@ import io
 import os
 import time
 import pandas as pd
+
+import google.generativeai as genai
+import json
+import base64
 load_dotenv()
 
 from .static import Static
@@ -301,3 +305,27 @@ def extract_bank_transactions(csv_source):
     records = final_df.to_dict(orient="records")
 
     return records
+
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+GeminiModel = genai.GenerativeModel("gemini-2.5-pro")
+
+def Gemini2Pro(prompt, base64_image, content_type='image/jpeg',):
+
+    image_bytes = base64.b64decode(base64_image)
+
+    response = GeminiModel.generate_content(
+        [
+            prompt,
+            {
+                "mime_type": content_type,
+                "data": image_bytes
+            }
+        ],
+        generation_config={
+            "response_mime_type": "application/json",
+            "temperature": 0
+        }
+    )
+
+    return response.text

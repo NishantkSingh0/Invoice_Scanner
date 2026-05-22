@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from .llm import llama4, extract_bank_transactions
+from .llm import llama4, extract_bank_transactions, Gemini2Pro
 from . import utils as ut
 from . import prompt as pr
 from .sheet import fill_sheet, fill_sheet_bulk
@@ -23,12 +23,14 @@ def detectAnomalyCells(json_Data, ProductCounts):
     columns=[]
     if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9:
         columns.append("GSTIN/UIN")
-    if SequenceMatcher(None, json_Data['VENDOR_NAME'], 'Crafted Oak & Ore').ratio() >0.8:
+    if SequenceMatcher(None, json_Data['VENDOR_NAME'], 'Crafted Oak & Ore pvt ltd').ratio() >0.8:
         columns.append("VENDOR_NAME")
     if ProductCounts>6:
         columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
     if str(json_Data['MONTH']).strip()=="NA":
         columns.append("MONTH")
+    if len(str(json_Data['INVOICE_NO']))>15:
+        columns.append("INVOICE_NO")
     if str(json_Data['FY']).strip()=="NA":
         columns.append("FY")
     if str(json_Data['AMOUNT']).strip()=="NA":
@@ -56,12 +58,12 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
     """
     try:
         print("Processing image")
-        url=bucket(base64_string=base64_image)
         # print("Scceed Url: ", url)
         llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
         if llm_response == "unable to parse":
             raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
         output = json.loads(llm_response)
+        url=bucket(base64_string=base64_image)
         assert output != "unable to parse", "Unable to parse invoice"
         # print("Parsing Succeed",output)
 
@@ -294,7 +296,7 @@ def render_pdf(request):
                     base64_image,
                     content_type,
                     SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'),
-                    sheet_name="FebTest"
+                    sheet_name="MPMSteds"
                 )
 
             elif key_name == "sales":
