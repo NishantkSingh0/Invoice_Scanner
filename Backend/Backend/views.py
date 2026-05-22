@@ -363,7 +363,7 @@ def render(request):
         # Process image and fill sheet
         if key_name=="purchase":
             print("Navigating to Purchase")
-            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="FebTest")
+            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="MPMSteds")
         elif key_name=="sales":
             print("Navigating to Sales")
             success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="sales")
