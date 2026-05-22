@@ -284,7 +284,7 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     json_path = os.path.join(base_dir, "vendor_gst_mapping.json")
-    
+
     # Load JSON
     with open(json_path, "r") as f:
         vendor_mapping = json.load(f)
@@ -293,6 +293,7 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
 
     best_match = None
     best_score = 0
+    Vendor_Name = "NA"
 
     for vendor_name, gst in vendor_mapping.items():
 
@@ -302,8 +303,9 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
         if score > best_score:
             best_score = score
             best_match = gst
+            Vendor_Name=vendor_name
 
-    print(f"Best Match Score: {best_score}")
+    print(f"Best Match Score: `{best_score}`, with vendor name: `{Vendor_Name}`")
 
     if best_score >= threshold:
         print(f"Vendor name matched with score {best_score}.")
