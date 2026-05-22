@@ -27,15 +27,15 @@ def detectAnomalyCells(json_Data, ProductCounts):
         columns.append("VENDOR_NAME")
     if ProductCounts>6:
         columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
-    if json_Data['MONTH'].strip()=="NA":
+    if str(json_Data['MONTH']).strip()=="NA":
         columns.append("MONTH")
-    if json_Data['FY'].strip()=="NA":
+    if str(json_Data['FY']).strip()=="NA":
         columns.append("FY")
-    if json_Data['AMOUNT'].strip()=="NA":
+    if str(json_Data['AMOUNT']).strip()=="NA":
         columns.append("AMOUNT")
     if str(json_Data['TOTAL_TAX']).strip().startswith("NA"):
         columns.append("TOTAL_TAX")
-    if json_Data['TOTAL_AMOUNT'].strip()=="Imp Details Missing":
+    if str(json_Data['TOTAL_AMOUNT']).strip()=="Imp Details Missing":
         columns.append("TOTAL_AMOUNT")
         columns.append("ITEM_RATE")
         columns.append("QTY")
@@ -75,7 +75,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
             text=f"{item['CGST']} + {item['SGST']}"
             DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
             GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-            Amount = str(float(str(item['QTY'].strip()).replace(',','')) * float(str(DiscountedRate))) if not str(item['QTY'].strip()).replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+            Amount = str(float(str(item['QTY']).strip().replace(',','')) * float(str(DiscountedRate))) if not str(item['QTY'].strip()).replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
             temp = {
                 "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
@@ -171,7 +171,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'
             text=f"{item['CGST']} + {item['SGST']}"
             # DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
             GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-            Amount = str(float(str(item['QTY'].strip()).replace(',','')) * float(str(itemRate))) if not str(item['QTY'].strip()).replace(',','').startswith("NA") and not str(itemRate).strip().startswith("NA") else "NA"
+            Amount = str(float(str(item['QTY']).strip().replace(',','')) * float(str(itemRate))) if not str(item['QTY']).strip().replace(',','').startswith("NA") and not str(itemRate).strip().startswith("NA") else "NA"
 
             temp = {
                 "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
