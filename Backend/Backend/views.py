@@ -29,7 +29,7 @@ def detectAnomalyCells(json_Data, ProductCounts):
         columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
     if str(json_Data['MONTH']).strip()=="NA":
         columns.append("MONTH")
-    if len(str(json_Data['INVOICE_NO']))>15:
+    if len(str(json_Data['INVOICE_NO']))>18:
         columns.append("INVOICE_NO")
     if str(json_Data['FY']).strip()=="NA":
         columns.append("FY")
