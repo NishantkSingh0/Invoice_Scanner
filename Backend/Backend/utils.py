@@ -267,7 +267,7 @@ def RefineSalesOrderData(data):
 
 import json
 from difflib import SequenceMatcher
-
+import os
 
 def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
     """
@@ -282,9 +282,11 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
     Returns:
         GST Number or "NA"
     """
-
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(base_dir, "vendor_gst_mapping.json")
+    
     # Load JSON
-    with open("vendor_gst_mapping.json", "r") as f:
+    with open(json_path, "r") as f:
         vendor_mapping = json.load(f)
 
     sample_vendor_name = sample_vendor_name.upper().strip().replace("&", "AND").replace(",", "").replace(".", "")
