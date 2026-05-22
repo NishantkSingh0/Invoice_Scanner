@@ -16,7 +16,7 @@ Extract These ACCURATELY from Invoices
       "LEDGER_ACCOUNT": "",
       "QTY": "",         (Accuracy require! RECHECK)
       "UNIT": "",            
-      "ITEM_RATE": "",        (Accuracy require! RECHECK)
+      "ITEM_RATE": "",        (Per Unit Cost of Product, Accuracy require! RECHECK)
       "DISCOUNT": "",         (in Percentage only, If not mentioned, keep it NA)
       "HSN/SAC": "",       (Accuracy require!)
       "CGST": "",         (Accuracy require!)
@@ -35,6 +35,7 @@ SMART FIELD MAPPING
 - "LEDGER_ACCOUNT" -> PURCHASE / FREIGHT INWARD / LABOUR CHARGES / INSURANCE / PACKING / CREDIT NOTE / NA
 - “Purchase Order No” can be written as `PO No`, `Purchase Order No`, `Pur Order No.`, `PO_NO` or something similar
 - "ITEM_RATE" can be written as Rate, Price, or something similar
+- "Formate Dates in `DD/MM/YYYY` or `DD-MM-YYYY` format.
 - If any value is missing, Just put `NA`, don't make guess in critical Fields
 
 ITEM RULES
