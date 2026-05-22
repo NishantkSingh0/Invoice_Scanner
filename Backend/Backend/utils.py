@@ -262,3 +262,50 @@ def RefineSalesOrderData(data):
         rows.append(row)
 
     return rows
+
+
+
+import json
+from difflib import SequenceMatcher
+
+
+def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
+    """
+    Reads vendor->GST JSON mapping
+    and returns GST if vendor name matches > threshold.
+
+    Args:
+        json_path (str)
+        sample_vendor_name (str)
+        threshold (float)
+
+    Returns:
+        GST Number or "NA"
+    """
+
+    # Load JSON
+    with open("vendor_gst_mapping.json", "r") as f:
+        vendor_mapping = json.load(f)
+
+    sample_vendor_name = sample_vendor_name.upper().strip().replace("&", "AND").replace(",", "").replace(".", "")
+
+    best_match = None
+    best_score = 0
+
+    for vendor_name, gst in vendor_mapping.items():
+
+        cleaned_vendor = vendor_name.upper().strip().replace("&", "AND").replace(",", "").replace(".", "")
+        score = SequenceMatcher(None, sample_vendor_name, cleaned_vendor).ratio()
+
+        if score > best_score:
+            best_score = score
+            best_match = gst
+
+    print(f"Best Match Score: {best_score}")
+
+    if best_score >= threshold:
+        print(f"Vendor name matched with score {best_score}.")
+        return best_match
+    else:
+        print(f"No matching vendor found with score >= {threshold}.")
+        return GSTNum

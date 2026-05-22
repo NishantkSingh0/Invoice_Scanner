@@ -2,7 +2,9 @@ from django.http import JsonResponse
 import json
 import base64
 import os
+import re
 import fitz  # pymupdf
+from difflib import SequenceMatcher
 import io
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -16,6 +18,29 @@ from .sheet import fill_sheet, fill_sheet_bulk
 import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
+
+def detectAnomalyCells(json_Data, ProductCounts):
+    columns=[]
+    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9:
+        columns.append("GSTIN/UIN")
+    if SequenceMatcher(None, json_Data['VENDOR_NAME'], 'Crafted Oak & Ore').ratio() >0.8:
+        columns.append("VENDOR_NAME")
+    if ProductCounts>6:
+        columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
+    if json_Data['MONTH'].strip()=="NA":
+        columns.append("MONTH")
+    if json_Data['FY'].strip()=="NA":
+        columns.append("FY")
+    if json_Data['AMOUNT'].strip()=="NA":
+        columns.append("AMOUNT")
+    if str(json_Data['TOTAL_TAX']).strip().startswith("NA"):
+        columns.append("TOTAL_TAX")
+    if json_Data['TOTAL_AMOUNT'].strip()=="Imp Details Missing":
+        columns.append("TOTAL_AMOUNT")
+        columns.append("ITEM_RATE")
+        columns.append("QTY")
+
+    return list(set(columns))
 
 
 def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Sheet1'):
@@ -39,34 +64,45 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
         output = json.loads(llm_response)
         assert output != "unable to parse", "Unable to parse invoice"
         # print("Parsing Succeed",output)
+
         success = True
+        ProductCounts=len(output['items'])
+        GSTNum=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
+
         for item in output['items']:
+
+            itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
+            text=f"{item['CGST']} + {item['SGST']}"
+            DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
+            GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
+            Amount = str(float(str(item['QTY'].strip()).replace(',','')) * float(str(DiscountedRate))) if not str(item['QTY'].strip()).replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+
             temp = {
-                "MONTH": output['INVOICE_DATE'].split("-")[1],
-                "FY": output['INVOICE_DATE'].split("-")[0],
+                "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
+                "FY": re.split(r"[-/]", output['INVOICE_DATE'])[0] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 0 else "NA",
                 "GR_DATE": output['INVOICE_DATE'],
                 "VENDOR_NAME": output['VENDOR_NAME'],
                 "PO_NO": output['PO_NO'],
                 "INVOICE_NO": output['INVOICE_NO'],
                 "INVOICE_DATE": output['INVOICE_DATE'],
-                "INTERNAL_REF": output['INTERNAL_REF'],
-                "GSTIN/UIN": output['GSTIN/UIN'],
+                "GSTIN/UIN": GSTNum,
                 "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                 "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
                 "QTY": item['QTY'],
                 "UNIT": item['UNIT'],
-                "ITEM_RATE": item['ITEM_RATE'],
-                "AMOUNT": item['AMOUNT'],
+                "ITEM_RATE": itemRate,
+                "AMOUNT": Amount,
+                "DISCOUNT": item['DISCOUNT'],
                 "HSN/SAC": item['HSN/SAC'],
                 "CGST": item['CGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
                 "SGST": item['SGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
                 "IGST": f"{item['CGST']} + {item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
-                "TOTAL_TAX": item['TOTAL_TAX'],
-                "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
+                "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
+                "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
                 "INVOICE_IMAGE": url
             }
             print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2):
+            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -115,42 +151,53 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'
     """
     try:
         print("Processing image")
-        url=bucket(base64_string=base64_image)
         # print("Scceed Url: ", url)
         llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
         if llm_response == "unable to parse":
             raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
+        
+        url=bucket(base64_string=base64_image)
         output = json.loads(llm_response)
         assert output != "unable to parse", "Unable to parse invoice"
         # print("Parsing Succeed",output)
+
         success = True
+        ProductCounts=len(output['items'])
+        GSTNum=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
+
         for item in output['items']:
+            
+            itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
+            text=f"{item['CGST']} + {item['SGST']}"
+            # DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
+            GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
+            Amount = str(float(str(item['QTY'].strip()).replace(',','')) * float(str(itemRate))) if not str(item['QTY'].strip()).replace(',','').startswith("NA") and not str(itemRate).strip().startswith("NA") else "NA"
+
             temp = {
-                "MONTH": output['INVOICE_DATE'].split("-")[1],
-                "FY": output['INVOICE_DATE'].split("-")[0],
+                "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
+                "FY": re.split(r"[-/]", output['INVOICE_DATE'])[0] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 0 else "NA",
                 "GR_DATE": output['INVOICE_DATE'],
                 "VENDOR_NAME": output['VENDOR_NAME'],
                 "PO_NO": output['PO_NO'],
                 "INVOICE_NO": output['INVOICE_NO'],
                 "INVOICE_DATE": output['INVOICE_DATE'],
-                "INTERNAL_REF": output['INTERNAL_REF'],
-                "GSTIN/UIN": output['GSTIN/UIN'],
+                "GSTIN/UIN": GSTNum,
                 "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                 "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
                 "QTY": item['QTY'],
                 "UNIT": item['UNIT'],
-                "ITEM_RATE": item['ITEM_RATE'],
-                "AMOUNT": item['AMOUNT'],
+                "ITEM_RATE": itemRate,
+                "AMOUNT": Amount,
                 "HSN/SAC": item['HSN/SAC'],
                 "CGST": item['CGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
                 "SGST": item['SGST'] if output['GSTIN/UIN'].startswith("09") else "NA",
                 "IGST": f"{item['CGST']} + {item['SGST']}" if not output['GSTIN/UIN'].startswith("09") else "NA",
-                "TOTAL_TAX": item['TOTAL_TAX'],
-                "TOTAL_AMOUNT": item['TOTAL_AMOUNT'],
+                "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
+                "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
                 "INVOICE_IMAGE": url
             }
             print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2):
+            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
                 success = False
                 break  # Stop on first failure, or continue based on requirement
         return success
@@ -184,7 +231,7 @@ def render_csv(request):
         success = process_bank_csv(file_bytes, SheetID=os.getenv('GOOGLE_SHEET_ID_BANK'))
 
         if success:
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({"success": True, "message": "Bank transactions uploaded successfully"})
         else:
             return JsonResponse({'error': 'Failed to process CSV or fill sheet'}, status=500)
 
@@ -247,7 +294,7 @@ def render_pdf(request):
                     base64_image,
                     content_type,
                     SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'),
-                    sheet_name="Purchase"
+                    sheet_name="FebTest"
                 )
 
             elif key_name == "sales":
@@ -275,8 +322,8 @@ def render_pdf(request):
 
         if all_success:
             return JsonResponse({
-                'status': 'success',
-                'pages_processed': total_pages
+                "success": True,
+                "message": f"All pages processed successfully. Total pages: {total_pages}"
             })
 
         return JsonResponse({
@@ -314,7 +361,7 @@ def render(request):
         # Process image and fill sheet
         if key_name=="purchase":
             print("Navigating to Purchase")
-            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="Purchase")
+            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="FebTest")
         elif key_name=="sales":
             print("Navigating to Sales")
             success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="sales")
@@ -322,7 +369,7 @@ def render(request):
             return JsonResponse({'error': 'Wrong KeyName provided'}, status=500)
         
         if success:
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({"success": True, "message": "Image processed and sheet updated successfully"})
         else:
             return JsonResponse({'error': 'Failed to process image or fill sheet'}, status=500)
     

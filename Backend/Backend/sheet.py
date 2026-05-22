@@ -4,6 +4,7 @@ from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 import os
+import re
 load_dotenv()
 
 GOOGLE_CREDENTIAL = os.getenv('GOOGLE_CREDENTIAL')
@@ -19,69 +20,181 @@ else:
     CREDENTIALS = Path(__file__).resolve().parent / 'credentials.json'
 
 
-def fill_sheet(json_data, SheetID: str, sheet_name='Sheet1', header_row=1):
+def hex_to_rgb(hex_color):
     """
-    Fills a Google Sheet with JSON data for one row.
-    
+    Convert HEX color to Google Sheets RGB format.
+    Example: #f9ede8
+    """
+
+    hex_color = hex_color.lstrip('#')
+
+    return {
+        "red": int(hex_color[0:2], 16) / 255,
+        "green": int(hex_color[2:4], 16) / 255,
+        "blue": int(hex_color[4:6], 16) / 255
+    }
+
+
+def fill_sheet(
+    json_data,
+    SheetID: str,
+    sheet_name='Sheet1',
+    header_row=1,
+    highlight_columns=None
+):
+    """
+    Fills a Google Sheet with JSON data for one row
+    and optionally highlights specific columns in the inserted row.
+
     Args:
-        json_data (dict): Dictionary with column names as keys and values to fill.
-        sheet_name (str): Name of the sheet tab (default: 'Sheet1').
-    
+        json_data (dict): Dictionary with column names as keys.
+        SheetID (str): Google Sheet ID.
+        sheet_name (str): Sheet tab name.
+        header_row (int): Header row number.
+        highlight_columns (list): List of column names to highlight.
+
     Returns:
-        bool: True if successful, False otherwise.
+        bool
     """
+
     sheet_id = SheetID
+
     try:
+
         if not sheet_id:
             raise ValueError("GOOGLE_SHEET_ID environment variable is required")
 
         # Load credentials
         if isinstance(CREDENTIALS, dict):
-            # print(f"fill_sheet: using env credentials dict, client_email={CREDENTIALS.get('client_email')}")
+
             if not CREDENTIALS.get('private_key'):
                 raise ValueError('Service account JSON is missing private_key')
-            # print(f"fill_sheet: private_key length={len(CREDENTIALS.get('private_key', ''))}")
-            creds = Credentials.from_service_account_info(CREDENTIALS, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+
+            creds = Credentials.from_service_account_info(
+                CREDENTIALS,
+                scopes=['https://www.googleapis.com/auth/spreadsheets']
+            )
+
         else:
-            # print(f"fill_sheet: using local credentials file path={CREDENTIALS}")
+
             if not CREDENTIALS.exists():
-                raise FileNotFoundError(f"Service account credentials file not found: {CREDENTIALS}")
-            creds = Credentials.from_service_account_file(str(CREDENTIALS), scopes=['https://www.googleapis.com/auth/spreadsheets'])
-        
-        # Build the service
+                raise FileNotFoundError(
+                    f"Service account credentials file not found: {CREDENTIALS}"
+                )
+
+            creds = Credentials.from_service_account_file(
+                str(CREDENTIALS),
+                scopes=['https://www.googleapis.com/auth/spreadsheets']
+            )
+
+        # Build service
         service = build('sheets', 'v4', credentials=creds)
-        
-        # Read the header row to get column names
+
+        # Read headers
         header_range = f'{sheet_name}!A{header_row}:ZZ{header_row}'
-        print("Header range: ",header_range)
-        result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=header_range).execute()
+
+        print("Header range: ", header_range)
+
+        result = service.spreadsheets().values().get(
+            spreadsheetId=sheet_id,
+            range=header_range
+        ).execute()
+
         headers = result.get('values', [[]])[0]
-        
+
         if not headers:
             print("No headers found in the sheet.")
             return False
-        
-        # Create the row data based on headers
+
+        # Create row
         row = []
+
         for header in headers:
             row.append(json_data.get(header, ''))
-        
-        # Append the row to the sheet
+
+        # Append row
         append_range = f'{sheet_name}!A:A'
+
         body = {
             'values': [row]
         }
-        service.spreadsheets().values().append(
+
+        append_response = service.spreadsheets().values().append(
             spreadsheetId=sheet_id,
             range=append_range,
             valueInputOption='RAW',
             body=body
         ).execute()
-        
+
+        # ===============================
+        # Highlight Specific Columns
+        # ===============================
+
+        if highlight_columns:
+
+            # Get inserted row number
+            updated_range = append_response['updates']['updatedRange']
+
+            # Example:
+            # Sheet1!A5:Z5
+
+            row_number = int(re.findall(r'\d+', updated_range)[0])
+
+            # Get sheet metadata
+            sheet_metadata = service.spreadsheets().get(
+                spreadsheetId=sheet_id
+            ).execute()
+
+            sheetId = None
+
+            for sheet in sheet_metadata['sheets']:
+
+                if sheet['properties']['title'] == sheet_name:
+                    sheetId = sheet['properties']['sheetId']
+                    break
+
+            if sheetId is not None:
+
+                requests = []
+
+                for column_name in highlight_columns:
+
+                    if column_name not in headers:
+                        continue
+
+                    col_idx = headers.index(column_name)
+
+                    requests.append({
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": sheetId,
+                                "startRowIndex": row_number - 1,
+                                "endRowIndex": row_number,
+                                "startColumnIndex": col_idx,
+                                "endColumnIndex": col_idx + 1
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "backgroundColor": hex_to_rgb("#f9ede8")
+                                }
+                            },
+                            "fields": "userEnteredFormat.backgroundColor"
+                        }
+                    })
+
+                if requests:
+
+                    service.spreadsheets().batchUpdate(
+                        spreadsheetId=sheet_id,
+                        body={"requests": requests}
+                    ).execute()
+
         return True
-    
+
     except Exception as e:
+
         print(f"Error filling sheet: {e}")
+
         return False
 
 

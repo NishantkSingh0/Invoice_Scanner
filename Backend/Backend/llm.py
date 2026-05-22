@@ -57,7 +57,7 @@ def llama4Test(
                 }
             ],
             temperature=1,
-            max_completion_tokens=6000,
+            max_completion_tokens=1000,
             top_p=1,
             stream=False,
         )
