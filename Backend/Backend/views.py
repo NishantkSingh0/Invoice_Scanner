@@ -21,7 +21,7 @@ from .bucketHandling import bucket
 
 def detectAnomalyCells(json_Data, ProductCounts):
     columns=[]
-    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9:
+    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN'])!=15:
         columns.append("GSTIN/UIN")
     if SequenceMatcher(None, json_Data['VENDOR_NAME'], 'Crafted Oak & Ore pvt ltd').ratio() >0.8:
         columns.append("VENDOR_NAME")
@@ -81,7 +81,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
 
             temp = {
                 "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
-                "FY": re.split(r"[-/]", output['INVOICE_DATE'])[0] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 0 else "NA",
+                "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
                 "GR_DATE": output['INVOICE_DATE'],
                 "VENDOR_NAME": output['VENDOR_NAME'],
                 "PO_NO": output['PO_NO'],
@@ -363,7 +363,7 @@ def render(request):
         # Process image and fill sheet
         if key_name=="purchase":
             print("Navigating to Purchase")
-            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="MPMSteds")
+            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="SHEELAFOAMLTD")
         elif key_name=="sales":
             print("Navigating to Sales")
             success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="sales")
