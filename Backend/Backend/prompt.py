@@ -14,7 +14,7 @@ Extract These ACCURATELY from Invoices
     {
       "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",            (The Product Name/Description Should be 100% Same as mentioned, Accuracy require! RECHECK)
       "LEDGER_ACCOUNT": "",
-      "QTY": "",         (Accuracy require! RECHECK)
+      "QUANTITY": "",         (Accuracy require! RECHECK)
       "UNIT": "",            
       "ITEM_RATE": "",        (Per Unit Cost of Product, Accuracy require! RECHECK)
       "DISCOUNT": "",         (in Percentage only, If not mentioned, keep it NA)
@@ -27,7 +27,7 @@ Extract These ACCURATELY from Invoices
 
 SMART FIELD MAPPING
 - (List all products even if it is 15, MISSING OF ANY SINGLE PRODUCT BECOME A VERY SERIOUS PROBLEM, Fetch Their Details Accurately & ROW-WISE, NO LAZINESS, NO SHORTCUTS),
-- The QTY And UnitRate SHOULD BE 100% ACCURATE,
+- The QUANTITY And UnitRate SHOULD BE 100% ACCURATE,
 - “VENDOR_NAME”: The supplier/seller/company issuing the invoice, NEVER BE `Crafted Oak & Ore Pvt Ltd`
 - "CGST" / "SGST"   (Should be in Percentage Only)
     If only IGST/GST percentage is present:

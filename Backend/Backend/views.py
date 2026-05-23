@@ -19,6 +19,11 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
+PURCHASE_SHEET_NAME="SHEELAFOAMLTD"
+SALES_SHEET_NAME="sales"
+BANK_SHEET_NAME="Bank"
+SALES_ORDER_SHEET_NAME="Sheet1"
+
 def detectAnomalyCells(json_Data, ProductCounts):
     columns=[]
     if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN'])!=15:
@@ -45,7 +50,7 @@ def detectAnomalyCells(json_Data, ProductCounts):
     return list(set(columns))
 
 
-def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Sheet1'):
+def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCHASE_SHEET_NAME):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
     
@@ -77,7 +82,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
             text=f"{item['CGST']} + {item['SGST']}"
             DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
             GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-            Amount = str(float(str(item['QTY'].split(" ")[0]).strip().replace(',','')) * float(str(DiscountedRate))) if not str(item['QTY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+            Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
             temp = {
                 "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
@@ -90,7 +95,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name='Shee
                 "GSTIN/UIN": GSTNum,
                 "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                 "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                "QTY": item['QTY'],
+                "QTY": item['QUANTITY'],
                 "UNIT": item['UNIT'],
                 "ITEM_RATE": itemRate,
                 "AMOUNT": Amount,
@@ -133,14 +138,14 @@ def process_bank_csv(file_bytes, SheetID):
         if not records:
             raise ValueError("No transaction records extracted from CSV")
         print("calling fill_sheet_bulk to update Data")
-        return fill_sheet_bulk(records, SheetID=SheetID, sheet_name='Bank', header_row=2)
+        return fill_sheet_bulk(records, SheetID=SheetID, sheet_name=BANK_SHEET_NAME, header_row=2)
 
     except Exception as e:
         print(f"Error in process_bank_csv: {e}")
         raise
 
 
-def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'):
+def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SHEET_NAME):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
     
@@ -173,7 +178,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'
             text=f"{item['CGST']} + {item['SGST']}"
             # DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
             GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-            Amount = str(float(str(item['QTY'].split(" ")[0]).strip().replace(',','')) * float(str(itemRate))) if not str(item['QTY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(itemRate).strip().startswith("NA") else "NA"
+            Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace(',','')) * float(str(itemRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(itemRate).strip().startswith("NA") else "NA"
 
             temp = {
                 "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
@@ -186,7 +191,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name='Sheet1'
                 "GSTIN/UIN": GSTNum,
                 "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                 "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                "QTY": item['QTY'],
+                "QTY": item['QUANTITY'],
                 "UNIT": item['UNIT'],
                 "ITEM_RATE": itemRate,
                 "AMOUNT": Amount,
@@ -296,7 +301,7 @@ def render_pdf(request):
                     base64_image,
                     content_type,
                     SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'),
-                    sheet_name="MPMSteds"
+                    sheet_name=PURCHASE_SHEET_NAME
                 )
 
             elif key_name == "sales":
@@ -307,7 +312,7 @@ def render_pdf(request):
                     base64_image,
                     content_type,
                     SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'),
-                    sheet_name="sales"
+                    sheet_name=SALES_SHEET_NAME
                 )
 
             else:
@@ -363,10 +368,10 @@ def render(request):
         # Process image and fill sheet
         if key_name=="purchase":
             print("Navigating to Purchase")
-            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name="SHEELAFOAMLTD")
+            success = process_purchase_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'), sheet_name=PURCHASE_SHEET_NAME)
         elif key_name=="sales":
             print("Navigating to Sales")
-            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name="sales")
+            success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name=SALES_SHEET_NAME)
         else:
             return JsonResponse({'error': 'Wrong KeyName provided'}, status=500)
         
@@ -517,35 +522,13 @@ def upload_excel(request):
 
         for i in range(len(parsed_data)):
 
-            # print(
-            #     f"\nParsed Data for Sheet: "
-            #     f"{parsed_data[i]['sheet_name']}"
-            # )
-
-            # print(
-            #     "Metadata:",
-            #     parsed_data[i]['metadata']
-            # )
-
-            # print("Table Data:")
-
-            # print(
-            #     parsed_data[i]['table_data']
-            # )
-
             # Process SINGLE sheet
             processedData = ut.RefineSalesOrderData(
                 parsed_data[i]
             )
 
             # Write to Google Sheet
-            is_success = fill_sheet_bulk(
-                processedData,
-                SheetID=os.getenv(
-                    "GOOGLE_SHEET_ID_SALES_ORDER"
-                ),
-                header_row=8
-            )
+            is_success = fill_sheet_bulk(processedData,SheetID=os.getenv("GOOGLE_SHEET_ID_SALES_ORDER"),header_row=8, sheet_name=SALES_ORDER_SHEET_NAME)
 
             print(
                 f"Sheet {i} write success: "
