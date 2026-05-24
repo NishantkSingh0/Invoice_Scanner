@@ -110,7 +110,30 @@ def fill_sheet(
         row = []
 
         for header in headers:
-            row.append(json_data.get(header, ''))
+
+            try:
+
+                value = json_data.get(header, '')
+
+                # Convert Exception object
+                if isinstance(value, Exception):
+
+                    value = f"[VALUE ERROR]: {str(value)}"
+
+                # Convert unsupported types
+                elif not isinstance(value, (str, int, float, bool, type(None))):
+
+                    value = str(value)
+
+                row.append(value)
+
+            except Exception as e:
+
+                error_msg = f"[COLUMN ERROR: {header}] {str(e)}"
+
+                print(error_msg)
+
+                row.append(error_msg)
 
         # Append row
         append_range = f'{sheet_name}!A:A'

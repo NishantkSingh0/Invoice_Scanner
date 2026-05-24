@@ -19,7 +19,7 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="SHEELAFOAMLTD"
+PURCHASE_SHEET_NAME="HOMEANDINDL"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
@@ -40,6 +40,8 @@ def detectAnomalyCells(json_Data, ProductCounts):
         columns.append("FY")
     if str(json_Data['AMOUNT']).strip()=="NA":
         columns.append("AMOUNT")
+    if str(json_Data['HSN/SAC']).strip()=="NA":
+        columns.append("HSN/SAC")
     if str(json_Data['TOTAL_TAX']).strip().startswith("NA"):
         columns.append("TOTAL_TAX")
     if str(json_Data['TOTAL_AMOUNT']).strip()=="Imp Details Missing":
@@ -50,7 +52,7 @@ def detectAnomalyCells(json_Data, ProductCounts):
     return list(set(columns))
 
 
-def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCHASE_SHEET_NAME):
+def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCHASE_SHEET_NAME, PageNum=None):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
     
@@ -77,41 +79,70 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
         GSTNum=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
 
         for item in output['items']:
+            try: 
+                itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
+                text=f"{item['CGST']} + {item['SGST']}"
+                DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
+                GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
+                Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
-            itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
-            text=f"{item['CGST']} + {item['SGST']}"
-            DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
-            GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-            Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
-
-            temp = {
-                "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
-                "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
-                "GR_DATE": output['INVOICE_DATE'],
-                "VENDOR_NAME": output['VENDOR_NAME'],
-                "PO_NO": output['PO_NO'],
-                "INVOICE_NO": output['INVOICE_NO'],
-                "INVOICE_DATE": output['INVOICE_DATE'],
-                "GSTIN/UIN": GSTNum,
-                "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
-                "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                "QTY": item['QUANTITY'],
-                "UNIT": item['UNIT'],
-                "ITEM_RATE": itemRate,
-                "AMOUNT": Amount,
-                "DISCOUNT": item['DISCOUNT'],
-                "HSN/SAC": item['HSN/SAC'],
-                "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
-                "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
-                "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
-                "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
-                "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
-                "INVOICE_IMAGE": url
-            }
-            print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
-                success = False
-                break  # Stop on first failure, or continue based on requirement
+                temp = {
+                    "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
+                    "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
+                    "GR_DATE": output['INVOICE_DATE'],
+                    "VENDOR_NAME": output['VENDOR_NAME'],
+                    "PO_NO": output['PO_NO'],
+                    "INVOICE_NO": output['INVOICE_NO'],
+                    "INVOICE_DATE": output['INVOICE_DATE'],
+                    "GSTIN/UIN": GSTNum,
+                    "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                    "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                    "QTY": item['QUANTITY'],
+                    "UNIT": item['UNIT'],
+                    "ITEM_RATE": itemRate,
+                    "AMOUNT": Amount,
+                    "DISCOUNT": item['DISCOUNT'],
+                    "HSN/SAC": item['HSN/SAC'],
+                    "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
+                    "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
+                    "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
+                    "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
+                    "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
+                    "INVOICE_IMAGE": url
+                }
+                print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
+                    success = False
+                    print(f"Failed to fill sheet for item: {item}")
+                    break  # Stop on first failure, or continue based on requirement
+            except Exception as e:
+                tempxvc={
+                        "MONTH": "error" if PageNum is None else f"Page: {PageNum}",
+                        "FY": "error",
+                        "GR_DATE": output['INVOICE_DATE'],
+                        "VENDOR_NAME": output['VENDOR_NAME'],
+                        "PO_NO": output['PO_NO'],
+                        "INVOICE_NO": output['INVOICE_NO'],
+                        "INVOICE_DATE": output['INVOICE_DATE'],
+                        "GSTIN/UIN": GSTNum,
+                        "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                        "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                        "QTY": item['QUANTITY'],
+                        "UNIT": item['UNIT'],
+                        "ITEM_RATE": item['ITEM_RATE'],
+                        "AMOUNT": "Error",
+                        "DISCOUNT": item['DISCOUNT'],
+                        "HSN/SAC": item['HSN/SAC'],
+                        "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
+                        "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
+                        "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
+                        "TOTAL_TAX": "error",
+                        "TOTAL_AMOUNT": "error",
+                        "INVOICE_IMAGE": url
+                    }
+                _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["MONTH","FY","GR_DATE","VENDOR_NAME","PO_NO","INVOICE_NO","INVOICE_DATE","GSTIN/UIN","ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER","LEDGER_ACCOUNT","QTY","UNIT","ITEM_RATE","AMOUNT","DISCOUNT","HSN/SAC","CGST","SGST","IGST","TOTAL_TAX","TOTAL_AMOUNT"])
+                print(f"Error processing item: {e}")
+                continue
         return success
     except Exception as e:
         print(f"Error in process_image: {e}")
@@ -173,41 +204,70 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
         GSTNum=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
 
         for item in output['items']:
-            
-            itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
-            text=f"{item['CGST']} + {item['SGST']}"
-            # DiscountedRate = itemRate if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace('%','').strip())/100))
-            GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-            Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace(',','')) * float(str(itemRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(itemRate).strip().startswith("NA") else "NA"
+            try:
+                itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
+                text=f"{item['CGST']} + {item['SGST']}"
+                DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
+                GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
+                Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
-            temp = {
-                "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
-                "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
-                "GR_DATE": output['INVOICE_DATE'],
-                "VENDOR_NAME": output['VENDOR_NAME'],
-                "PO_NO": output['PO_NO'],
-                "INVOICE_NO": output['INVOICE_NO'],
-                "INVOICE_DATE": output['INVOICE_DATE'],
-                "GSTIN/UIN": GSTNum,
-                "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
-                "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                "QTY": item['QUANTITY'],
-                "UNIT": item['UNIT'],
-                "ITEM_RATE": itemRate,
-                "AMOUNT": Amount,
-                "HSN/SAC": item['HSN/SAC'],
-                "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
-                "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
-                "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
-                "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
-                "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
-                "INVOICE_IMAGE": url
-            }
-            print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-            if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
-                success = False
-                break  # Stop on first failure, or continue based on requirement
-        return success
+                temp = {
+                    "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
+                    "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
+                    "GR_DATE": output['INVOICE_DATE'],
+                    "VENDOR_NAME": output['VENDOR_NAME'],
+                    "PO_NO": output['PO_NO'],
+                    "INVOICE_NO": output['INVOICE_NO'],
+                    "INVOICE_DATE": output['INVOICE_DATE'],
+                    "GSTIN/UIN": GSTNum,
+                    "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                    "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                    "QTY": item['QUANTITY'],
+                    "UNIT": item['UNIT'],
+                    "ITEM_RATE": itemRate,
+                    "AMOUNT": Amount,
+                    "HSN/SAC": item['HSN/SAC'],
+                    "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
+                    "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
+                    "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
+                    "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
+                    "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
+                    "INVOICE_IMAGE": url
+                }
+                print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
+                    success = False
+                    print(f"Failed to fill sheet for item: {item}")
+                    break  # Stop on first failure, or continue based on requirement
+            except Exception as e:
+                tempxvc={
+                        "MONTH": "error",
+                        "FY": "error",
+                        "GR_DATE": output['INVOICE_DATE'],
+                        "VENDOR_NAME": output['VENDOR_NAME'],
+                        "PO_NO": output['PO_NO'],
+                        "INVOICE_NO": output['INVOICE_NO'],
+                        "INVOICE_DATE": output['INVOICE_DATE'],
+                        "GSTIN/UIN": GSTNum,
+                        "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                        "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                        "QTY": item['QUANTITY'],
+                        "UNIT": item['UNIT'],
+                        "ITEM_RATE": item['ITEM_RATE'],
+                        "AMOUNT": "Error",
+                        "DISCOUNT": item['DISCOUNT'],
+                        "HSN/SAC": item['HSN/SAC'],
+                        "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
+                        "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
+                        "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
+                        "TOTAL_TAX": "error",
+                        "TOTAL_AMOUNT": "error",
+                        "INVOICE_IMAGE": url
+                    }
+                _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["MONTH","FY","GR_DATE","VENDOR_NAME","PO_NO","INVOICE_NO","INVOICE_DATE","GSTIN/UIN","ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER","LEDGER_ACCOUNT","QTY","UNIT","ITEM_RATE","AMOUNT","DISCOUNT","HSN/SAC","CGST","SGST","IGST","TOTAL_TAX","TOTAL_AMOUNT"])
+                print(f"Error processing item: {e}")
+                continue
+            return success
     except Exception as e:
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message
@@ -266,48 +326,35 @@ def render_pdf(request):
 
         # Open PDF from memory
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-
         total_pages = len(pdf_document)
-
         print(f"Total Pages: {total_pages}")
-
         all_success = True
-
         for page_index in range(total_pages):
 
             print(f"Processing Page {page_index + 1}")
-
             page = pdf_document.load_page(page_index)
-
             # Increase quality if needed
             matrix = fitz.Matrix(2, 2)
-
             pix = page.get_pixmap(matrix=matrix)
-
             # Convert page image to bytes
             image_bytes = pix.tobytes("png")
-
             # Base64 encode
             base64_image = base64.b64encode(image_bytes).decode("utf-8")
-
             content_type = "image/png"
-
             # Process page
             if key_name == "purchase":
 
                 print("Navigating to Purchase")
-
                 success = process_purchase_image(
                     base64_image,
                     content_type,
                     SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'),
-                    sheet_name=PURCHASE_SHEET_NAME
+                    sheet_name=PURCHASE_SHEET_NAME,
+                    PageNum=page_index + 1
                 )
 
             elif key_name == "sales":
-
                 print("Navigating to Sales")
-
                 success = process_sales_image(
                     base64_image,
                     content_type,
@@ -326,7 +373,6 @@ def render_pdf(request):
                 print(f"Failed on page {page_index + 1}")
 
         pdf_document.close()
-
         if all_success:
             return JsonResponse({
                 "success": True,
@@ -397,9 +443,6 @@ def validate_credentials(user_id, password):
         'userid': os.getenv('EMP_ID'),
         'password': os.getenv('PASSWORD'),
     }
-    # print(f"Validating credentials for user_id: {user_id}")
-    # print(f"Expected password for {user_id}: {VALID_CREDENTIALS.get('password')}")
-    # print(f"Provided password for {user_id}: {password}")
     
     return user_id == VALID_CREDENTIALS['userid'] and VALID_CREDENTIALS['password'] == password
 

@@ -289,7 +289,7 @@ export default function UploadImage() {
 
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
 
-                Uploading...
+                Rendering... Visit Sheet,
 
               </div>
 
@@ -446,7 +446,7 @@ export default function UploadImage() {
 
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
 
-              Uploading...
+              Rendering... Visit Sheet,
 
             </div>
 
