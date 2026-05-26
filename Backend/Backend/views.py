@@ -19,16 +19,16 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="HOMEANDINDL"
+PURCHASE_SHEET_NAME="InderMedical"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
 
 def detectAnomalyCells(json_Data, ProductCounts):
     columns=[]
-    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN'])!=15:
+    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15:
         columns.append("GSTIN/UIN")
-    if SequenceMatcher(None, json_Data['VENDOR_NAME'], 'Crafted Oak & Ore pvt ltd').ratio() >0.8:
+    if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8:
         columns.append("VENDOR_NAME")
     if ProductCounts>6:
         columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
@@ -48,6 +48,7 @@ def detectAnomalyCells(json_Data, ProductCounts):
         columns.append("TOTAL_AMOUNT")
         columns.append("ITEM_RATE")
         columns.append("QTY")
+        columns.append("TOTAL_TAX")
 
     return list(set(columns))
 
@@ -76,7 +77,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
 
         success = True
         ProductCounts=len(output['items'])
-        GSTNum=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
+        GSTNum, vendorname=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
 
         for item in output['items']:
             try: 
@@ -90,7 +91,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
                     "GR_DATE": output['INVOICE_DATE'],
-                    "VENDOR_NAME": output['VENDOR_NAME'],
+                    "VENDOR_NAME": vendorname,
                     "PO_NO": output['PO_NO'],
                     "INVOICE_NO": output['INVOICE_NO'],
                     "INVOICE_DATE": output['INVOICE_DATE'],
@@ -201,7 +202,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
 
         success = True
         ProductCounts=len(output['items'])
-        GSTNum=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
+        GSTNum, vendorname=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
 
         for item in output['items']:
             try:
@@ -215,7 +216,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
                     "GR_DATE": output['INVOICE_DATE'],
-                    "VENDOR_NAME": output['VENDOR_NAME'],
+                    "VENDOR_NAME": vendorname,
                     "PO_NO": output['PO_NO'],
                     "INVOICE_NO": output['INVOICE_NO'],
                     "INVOICE_DATE": output['INVOICE_DATE'],

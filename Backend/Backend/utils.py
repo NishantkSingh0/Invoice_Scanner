@@ -269,7 +269,7 @@ import json
 from difflib import SequenceMatcher
 import os
 
-def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
+def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.92):
     """
     Reads vendor->GST JSON mapping
     and returns GST if vendor name matches > threshold.
@@ -309,7 +309,7 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.96):
 
     if best_score >= threshold:
         print(f"Vendor name matched with score {best_score}.")
-        return best_match
+        return best_match, Vendor_Name
     else:
         print(f"No matching vendor found with score >= {threshold}.")
-        return GSTNum
+        return GSTNum, sample_vendor_name
