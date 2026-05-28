@@ -19,7 +19,7 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="HOMEANDINDL"
+PURCHASE_SHEET_NAME="MAYPURCHASE"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
