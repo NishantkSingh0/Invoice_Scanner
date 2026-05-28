@@ -1,10 +1,12 @@
+from urllib import response
+
 from groq import Groq
 from dotenv import load_dotenv
 import io
 import os
 import time
 import pandas as pd
-
+import re
 import google.generativeai as genai
 import json
 import base64
@@ -23,6 +25,7 @@ GROQ_KEYS = [
 # remove empty keys
 GROQ_KEYS = [k for k in GROQ_KEYS if k]
 
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # =========================
 # CREATE CLIENT
@@ -168,6 +171,48 @@ def llama4(
             retry_count + 1
         )
 
+
+def gemini_inference(prompt, base64_image, content_type='image/jpeg', model="gemini-2.5-pro"):
+
+
+    try:
+        # Create model
+        model = genai.GenerativeModel(
+            model_name=model,
+            system_instruction="""You are a Accountant who manages all purchase/Sales Records accurately"""
+        )
+
+        # Generate response
+        response = model.generate_content(
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "mime_type": content_type,
+                            "data": base64_image
+                        },
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        )
+
+        text = response.text.strip()
+
+        # Remove markdown if Gemini still returns it
+        text = re.sub(r"^```json", "", text)
+        text = re.sub(r"^```", "", text)
+        text = re.sub(r"```$", "", text)
+        text = text.strip()
+        json.loads(text)
+        return text
+    except Exception as e:
+        print("Gemini Returned Invalid JSON:")
+        print(text)
+        return "unable to parse"
 
 
 def extract_bank_transactions(csv_source):

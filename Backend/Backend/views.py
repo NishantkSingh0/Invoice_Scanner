@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from .llm import llama4, extract_bank_transactions, Gemini2Pro
+from .llm import llama4, extract_bank_transactions, gemini_inference
 from . import utils as ut
 from . import prompt as pr
 from .sheet import fill_sheet, fill_sheet_bulk
@@ -19,7 +19,7 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="InderMedical"
+PURCHASE_SHEET_NAME="HOMEANDINDL"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
@@ -67,7 +67,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
     try:
         print("Processing image")
         # print("Scceed Url: ", url)
-        llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
+        llm_response = gemini_inference(pr.OCR_PROMPT, base64_image, content_type)
         if llm_response == "unable to parse":
             raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
         output = json.loads(llm_response)
@@ -191,7 +191,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
     try:
         print("Processing image")
         # print("Scceed Url: ", url)
-        llm_response = llama4(pr.OCR_PROMPT, base64_image, content_type)
+        llm_response = gemini_inference(pr.OCR_PROMPT, base64_image, content_type)
         if llm_response == "unable to parse":
             raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
         
