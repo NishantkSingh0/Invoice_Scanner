@@ -24,8 +24,8 @@ SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
 
-def detectAnomalyCells(json_Data, ProductCounts):
-    columns=[]
+def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
+    columns=preRegisteredCells
     if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15:
         columns.append("GSTIN/UIN")
     if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8:
@@ -78,9 +78,19 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
         success = True
         ProductCounts=len(output['items'])
         GSTNum, vendorname=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
-
+        preRegisteredCells=[]
         for item in output['items']:
             try: 
+                # By default Handlings
+                if item['QUANTITY']=="NA":
+                    item['QUANTITY']="1"
+                    preRegisteredCells.append("QTY")
+                if item['CGST']=="NA" or item['SGST']=="NA":
+                    item['CGST']="9"
+                    item['SGST']="9"
+                    preRegisteredCells.append("CGST")
+                    preRegisteredCells.append("SGST")
+
                 itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
                 text=f"{item['CGST']} + {item['SGST']}"
                 DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" or item['DISCOUNT']=="NULL" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
@@ -116,7 +126,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "INVOICE_IMAGE": url
                 }
                 print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts, preRegisteredCells=preRegisteredCells)):
                     success = False
                     print(f"Failed to fill sheet for item: {item}")
                     break  # Stop on first failure, or continue based on requirement
@@ -207,9 +217,19 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
         success = True
         ProductCounts=len(output['items'])
         GSTNum, vendorname=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
-
+        preRegisteredCells=[]
         for item in output['items']:
-            try:
+            try: 
+                # By default Handlings
+                if item['QUANTITY']=="NA":
+                    item['QUANTITY']="1"
+                    preRegisteredCells.append("QTY")
+                if item['CGST']=="NA" or item['SGST']=="NA":
+                    item['CGST']="9"
+                    item['SGST']="9"
+                    preRegisteredCells.append("CGST")
+                    preRegisteredCells.append("SGST")
+                    
                 itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
                 text=f"{item['CGST']} + {item['SGST']}"
                 DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
@@ -245,7 +265,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     "INVOICE_IMAGE": url
                 }
                 print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts)):
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts, preRegisteredCells=preRegisteredCells)):
                     success = False
                     print(f"Failed to fill sheet for item: {item}")
                     break  # Stop on first failure, or continue based on requirement
