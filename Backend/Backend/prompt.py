@@ -12,7 +12,7 @@ Extract These ACCURATELY from Invoices
 
   "items": [      (List all products even if it is 15, Fetch Their Details Accurately & ROW-WISE, NO LAZINESS, NO SHORTCUTS)
     {
-      "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",            (The Product Name/Description Should be 100% Same as mentioned, Accuracy require! RECHECK)
+      "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",            (The Product Name/Description Should be 100% Same and complete as mentioned, Accuracy require! RECHECK)
       "LEDGER_ACCOUNT": "",
       "QUANTITY": "",         (Accuracy require! RECHECK)
       "UNIT": "",            
