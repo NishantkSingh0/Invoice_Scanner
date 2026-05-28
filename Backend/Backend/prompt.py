@@ -25,6 +25,20 @@ Extract These ACCURATELY from Invoices
   ]
 }
 
+for FREIGHT/INSURANCE/LABOUR/TRANSPORTATION/OTHER SERVICE CHARGES Return Item details as: (Keep UnWanted Things as NULL and charges Amount inside QUANTITY Field)
+{
+  "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",            (Charges Name)
+  "LEDGER_ACCOUNT": "SERVICE CHARGES",   
+  "QUANTITY": "Charge Amount here!! in rupees",        
+  "UNIT": "NULL",            
+  "ITEM_RATE": "NULL",
+  "DISCOUNT": "NULL",        
+  "HSN/SAC": "NULL",
+  "CGST": "",         (Same as Product gst's)
+  "SGST": ""         (Same as Product gst's)
+}
+
+
 SMART FIELD MAPPING
 - (List all products even if it is 15, MISSING OF ANY SINGLE PRODUCT BECOME A VERY SERIOUS PROBLEM, Fetch Their Details Accurately & ROW-WISE, NO LAZINESS, NO SHORTCUTS),
 - The QUANTITY And UnitRate SHOULD BE 100% ACCURATE,

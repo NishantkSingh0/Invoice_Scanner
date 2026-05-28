@@ -73,7 +73,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
         output = json.loads(llm_response)
         url=bucket(base64_string=base64_image)
         assert output != "unable to parse", "Unable to parse invoice"
-        # print("Parsing Succeed",output)
+        print("Parsing Succeed",output)
 
         success = True
         ProductCounts=len(output['items'])
@@ -83,9 +83,13 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
             try: 
                 itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
                 text=f"{item['CGST']} + {item['SGST']}"
-                DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
+                DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" or item['DISCOUNT']=="NULL" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
                 GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-                Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+                if item["UNIT"].lower()== "null" and item["ITEM_RATE"].lower() == "null":
+                    print("Inside Frieght condition")
+                    Amount = item["QUANTITY"].replace(',','').replace('₹','').strip()
+                else:
+                    Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
@@ -98,7 +102,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "GSTIN/UIN": GSTNum,
                     "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                     "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                    "QTY": item['QUANTITY'],
+                    "QTY": item['QUANTITY'] if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
                     "UNIT": item['UNIT'],
                     "ITEM_RATE": itemRate,
                     "AMOUNT": Amount,
@@ -210,7 +214,12 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                 text=f"{item['CGST']} + {item['SGST']}"
                 DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
                 GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-                Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+                if item["UNIT"].lower()== "null" and item["ITEM_RATE"].lower() == "null":
+                    print("Inside Frieght condition")
+                    Amount = item["QUANTITY"].replace(',','').replace('₹','').strip()
+                else:
+                    Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+
 
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
@@ -223,7 +232,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     "GSTIN/UIN": GSTNum,
                     "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                     "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                    "QTY": item['QUANTITY'],
+                    "QTY": item['QUANTITY'] if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
                     "UNIT": item['UNIT'],
                     "ITEM_RATE": itemRate,
                     "AMOUNT": Amount,

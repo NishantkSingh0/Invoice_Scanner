@@ -198,7 +198,7 @@ def fill_sheet(
                             },
                             "cell": {
                                 "userEnteredFormat": {
-                                    "backgroundColor": hex_to_rgb("#f9ede8")
+                                    "backgroundColor": hex_to_rgb("#fefbe6")
                                 }
                             },
                             "fields": "userEnteredFormat.backgroundColor"
