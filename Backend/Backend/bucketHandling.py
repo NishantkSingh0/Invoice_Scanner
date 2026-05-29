@@ -1,33 +1,76 @@
 from imagekitio import ImageKit
 from dotenv import load_dotenv
-import base64
+from PIL import Image
 from io import BytesIO
+import base64
 import os
 
 load_dotenv()
 
-def bucket(base64_string: str, fileName: str = "inv"):
+
+def compress_image(base64_string: str, max_width: int = 1500, quality: int = 85):
+    """
+    Compress image while preserving OCR readability.
+    Returns BytesIO object ready for upload.
+    """
+
+    image_bytes = base64.b64decode(base64_string)
+
+    img = Image.open(BytesIO(image_bytes))
+
+    # Convert transparent images to RGB
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    # Resize only if image is too large
+    if img.width > max_width:
+        ratio = max_width / img.width
+        new_height = int(img.height * ratio)
+
+        img = img.resize(
+            (max_width, new_height),
+            Image.LANCZOS
+        )
+
+    output = BytesIO()
+
+    img.save(
+        output,
+        format="JPEG",
+        quality=quality,
+        optimize=True
+    )
+
+    output.seek(0)
+
+    return output
+
+
+def bucket(base64_string: str, file_name: str = "inv"):
     print("Bucket called")
+
     imagekit = ImageKit(
         private_key=os.getenv("IMAGEKIT_PRIVATE_KEY")
     )
-    extension = "png"
-    # detect mime type
-    if base64_string.startswith("data:image/"):
-        header = base64_string.split(";")[0]
-        extension = header.split("/")[-1]
-        base64_string = base64_string.split(",")[1]
 
-    image_bytes = base64.b64decode(base64_string)
-    file_object = BytesIO(image_bytes)
-    final_name = f"{fileName}.{extension}"
+    # Remove Base64 Header
+    if base64_string.startswith("data:image/"):
+        base64_string = base64_string.split(",", 1)[1]
+
+    # Compress image
+    compressed_file = compress_image(
+        base64_string,
+        max_width=1500,
+        quality=85
+    )
 
     response = imagekit.files.upload(
-        file=file_object,
-        file_name=final_name,
+        file=compressed_file,
+        file_name=f"{file_name}.jpg",
         folder="/inv",
         use_unique_file_name=True
     )
-    
+
     print("Response:", response)
+
     return response.url

@@ -56,6 +56,7 @@ SMART FIELD MAPPING
 - "ITEM_RATE" can be written as Rate, Price, or something similar
 - "Formate Dates in `DD-MM-YYYY` only.
 - If any value is missing, Just put `NA`, don't make guess in critical Fields
+- Ignore all other fields, that are not mentioned in Above Json.
 
 ITEM RULES
 1. Even on So much products mentioned, Fetch Their Details Accurately, NO LAZINESS, NO SHORTCUTS
