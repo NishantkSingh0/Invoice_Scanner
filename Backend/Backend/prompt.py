@@ -8,6 +8,7 @@ Extract These ACCURATELY from Invoices
   "GSTIN/UIN": "",            (The GTSTIN Number EXCEPT OF `09AAMCC1953B1ZS`)
   "INVOICE_NO": "",          (Accuracy require! RECHECK)
   "INVOICE_DATE": "",          (Accuracy require!)
+  "GRDATE": "",              (Accuracy require!)
   "PO_NO": "",                (Can be written in Top of Invoice with pencil, only If not mentioned You can keep it NA)
 
   "items": [      (List all products even if it is 15, Fetch Their Details Accurately & ROW-WISE, NO LAZINESS, NO SHORTCUTS)
@@ -48,11 +49,12 @@ SMART FIELD MAPPING
       CGST = IGST% / 2
       SGST = IGST% / 2
 - The Product Description Should be 100% Same as mentioned in Invoice.
+- GRDATE is Date Mentioned With Stamp at middle of invoice, if not mentioned keep it NA
 - "LEDGER_ACCOUNT" -> PURCHASE / FREIGHT INWARD / LABOUR CHARGES / INSURANCE / PACKING / CREDIT NOTE / NA
 - “Purchase Order No” can be written as `PO No`, `Purchase Order No`, `Pur Order No.`, `PO_NO` or something similar
 - Discount will be in Integer/float percentage only.. (If mentioned Y+X+Y formate.. just sum their values)
 - "ITEM_RATE" can be written as Rate, Price, or something similar
-- "Formate Dates in `DD/MM/YYYY` or `DD-MM-YYYY` format.
+- "Formate Dates in `DD-MM-YYYY` only.
 - If any value is missing, Just put `NA`, don't make guess in critical Fields
 
 ITEM RULES

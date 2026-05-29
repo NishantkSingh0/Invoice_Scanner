@@ -25,7 +25,7 @@ def bucket(base64_string: str, fileName: str = "inv"):
     response = imagekit.files.upload(
         file=file_object,
         file_name=final_name,
-        folder="/Invoices",
+        folder="/inv",
         use_unique_file_name=True
     )
     

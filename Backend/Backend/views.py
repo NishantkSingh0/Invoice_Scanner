@@ -26,7 +26,7 @@ SALES_ORDER_SHEET_NAME="Sheet1"
 
 def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
-    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15:
+    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15 or not json_Data['GSTIN/UIN'].strip()[:2].isdigit() or json_Data['GSTIN/UIN'].strip()[2:7].isdigit():
         columns.append("GSTIN/UIN")
     if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8:
         columns.append("VENDOR_NAME")
@@ -105,7 +105,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
-                    "GR_DATE": output['INVOICE_DATE'],
+                    "GR_DATE": output['GRDATE'],
                     "VENDOR_NAME": vendorname,
                     "PO_NO": output['PO_NO'],
                     "INVOICE_NO": output['INVOICE_NO'],
@@ -246,7 +246,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
-                    "GR_DATE": output['INVOICE_DATE'],
+                    "GR_DATE": output['GRDATE'],
                     "VENDOR_NAME": vendorname,
                     "PO_NO": output['PO_NO'],
                     "INVOICE_NO": output['INVOICE_NO'],
