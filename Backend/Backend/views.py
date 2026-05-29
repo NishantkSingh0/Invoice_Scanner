@@ -113,9 +113,9 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "GSTIN/UIN": GSTNum,
                     "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                     "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                    "QTY": item['QUANTITY'] if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
+                    "QTY": item['QUANTITY'],
                     "UNIT": item['UNIT'],
-                    "ITEM_RATE": itemRate,
+                    "ITEM_RATE": itemRate if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
                     "AMOUNT": Amount,
                     "DISCOUNT": item['DISCOUNT'],
                     "HSN/SAC": item['HSN/SAC'],
@@ -254,9 +254,9 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     "GSTIN/UIN": GSTNum,
                     "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
                     "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
-                    "QTY": item['QUANTITY'] if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
+                    "QTY": item['QUANTITY'],
                     "UNIT": item['UNIT'],
-                    "ITEM_RATE": itemRate,
+                    "ITEM_RATE": itemRate  if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
                     "AMOUNT": Amount,
                     "HSN/SAC": item['HSN/SAC'],
                     "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
@@ -406,13 +406,11 @@ def render_pdf(request):
 
         pdf_document.close()
         if all_success:
-            return JsonResponse({
-                "success": True,
-                "message": f"All pages processed successfully. Total pages: {total_pages}"
-            })
+            return JsonResponse({"success": True, "message": "Image processed and sheet updated successfully"})
 
         return JsonResponse({
-            'error': 'Some pages failed processing'
+            "success": True,
+            "message": 'Some pages failed processing'
         }, status=500)
 
     except Exception as e:

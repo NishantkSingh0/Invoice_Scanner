@@ -1,4 +1,4 @@
-OCR_PROMPT="""You are an Account Manager, Read All invoices Correctly, And Keep balance Structured
+OCR_PROMPT="""You are an Account Manager, Read invoice Correctly, And Keep balance Accurate.
 
 
 Extract These ACCURATELY from Invoices

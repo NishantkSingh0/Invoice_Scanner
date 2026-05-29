@@ -172,12 +172,12 @@ export default function UploadImage() {
       toast.success(
 
         isBank
-          ? "CSV Uploaded Successfully ✅"
+          ? "CSV Rendered Successfully ✅"
           : isSalesOrder
-            ? "Sales Order Uploaded Successfully ✅"
+            ? "Sales Order Rendered Successfully ✅"
             : file.type === "application/pdf"
-              ? "PDF Uploaded Successfully ✅"
-              : "Image Uploaded Successfully ✅"
+              ? "PDF Rendered Successfully ✅"
+              : "Image Rendered Successfully ✅"
       );
 
       setFile(null);
