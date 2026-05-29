@@ -26,7 +26,7 @@ Extract These ACCURATELY from Invoices
   ]
 }
 
-for FREIGHT/INSURANCE/LABOUR/TRANSPORTATION/OTHER SERVICE CHARGES Return Item details as: (Keep UnWanted Things as NULL and charges Amount inside QUANTITY Field)
+for FREIGHT/INSURANCE/LABOUR/TRANSPORTATION/OTHER SERVICE CHARGES Return Item details as: (Keep UnWanted Things as NULL and charges Amount inside QUANTITY Field) (Don't include ROUND OFF's)
 {
   "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",   (Charges Name)
   "LEDGER_ACCOUNT": "SERVICE CHARGES",   

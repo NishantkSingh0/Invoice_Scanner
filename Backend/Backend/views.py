@@ -19,14 +19,14 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="MAYPURCHASE"
+PURCHASE_SHEET_NAME="Mixedtest"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
 
 def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
-    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15 or not json_Data['GSTIN/UIN'].strip()[:2].isdigit() or json_Data['GSTIN/UIN'].strip()[2:7].isdigit():
+    if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15 or not json_Data['GSTIN/UIN'].strip()[:2].isdigit() or json_Data['GSTIN/UIN'].replace(" ", "")[2:7].isdigit():
         columns.append("GSTIN/UIN")
     if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8:
         columns.append("VENDOR_NAME")
