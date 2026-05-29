@@ -30,7 +30,7 @@ def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
         columns.append("GSTIN/UIN")
     if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8:
         columns.append("VENDOR_NAME")
-    if ProductCounts>6:
+    if ProductCounts>12:
         columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
     if str(json_Data['MONTH']).strip()=="NA":
         columns.append("MONTH")
@@ -90,14 +90,15 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     item['SGST']="9"
                     preRegisteredCells.append("CGST")
                     preRegisteredCells.append("SGST")
+                    preRegisteredCells.append("IGST")
 
                 itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
                 text=f"{item['CGST']} + {item['SGST']}"
                 DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" or item['DISCOUNT']=="NULL" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
                 GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-                if item["UNIT"].lower()== "null" and item["ITEM_RATE"].lower() == "null":
-                    print("Inside Frieght condition")
-                    Amount = item["QUANTITY"].replace(',','').replace('₹','').strip()
+                if item["UNIT"].lower()== "null" and item["QUANTITY"].lower() == "null":
+                    # print("Inside Frieght condition")
+                    Amount = item["ITEM_RATE"].replace(',','').replace('₹','').strip()
                 else:
                     Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
@@ -145,7 +146,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                         "QTY": item['QUANTITY'],
                         "UNIT": item['UNIT'],
                         "ITEM_RATE": item['ITEM_RATE'],
-                        "AMOUNT": "Error",
+                        "AMOUNT": f"Error: {e}",
                         "DISCOUNT": item['DISCOUNT'],
                         "HSN/SAC": item['HSN/SAC'],
                         "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
@@ -229,14 +230,15 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     item['SGST']="9"
                     preRegisteredCells.append("CGST")
                     preRegisteredCells.append("SGST")
+                    preRegisteredCells.append("IGST")
                     
                 itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
                 text=f"{item['CGST']} + {item['SGST']}"
                 DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
                 GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
-                if item["UNIT"].lower()== "null" and item["ITEM_RATE"].lower() == "null":
+                if item["UNIT"].lower()== "null" and item["QUANTITY"].lower() == "null":
                     print("Inside Frieght condition")
-                    Amount = item["QUANTITY"].replace(',','').replace('₹','').strip()
+                    Amount = item["ITEM_RATE"].replace(',','').replace('₹','').strip()
                 else:
                     Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
 
@@ -284,7 +286,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                         "QTY": item['QUANTITY'],
                         "UNIT": item['UNIT'],
                         "ITEM_RATE": item['ITEM_RATE'],
-                        "AMOUNT": "Error",
+                        "AMOUNT": f"Error: {e}",
                         "DISCOUNT": item['DISCOUNT'],
                         "HSN/SAC": item['HSN/SAC'],
                         "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",

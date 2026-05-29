@@ -27,15 +27,15 @@ Extract These ACCURATELY from Invoices
 
 for FREIGHT/INSURANCE/LABOUR/TRANSPORTATION/OTHER SERVICE CHARGES Return Item details as: (Keep UnWanted Things as NULL and charges Amount inside QUANTITY Field)
 {
-  "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",            (Charges Name)
+  "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",   (Charges Name)
   "LEDGER_ACCOUNT": "SERVICE CHARGES",   
-  "QUANTITY": "Charge Amount here!! in rupees",        
+  "QUANTITY": "NULL",        
   "UNIT": "NULL",            
-  "ITEM_RATE": "NULL",
+  "ITEM_RATE": "Charge Amount here!! in rupees",
   "DISCOUNT": "NULL",        
   "HSN/SAC": "NULL",
-  "CGST": "",         (Same as Product gst's)
-  "SGST": ""         (Same as Product gst's)
+  "CGST": "",         (Same as Product CGST)
+  "SGST": ""         (Same as Product SGST)
 }
 
 
