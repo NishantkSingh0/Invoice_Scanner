@@ -298,7 +298,8 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.92):
     for vendor_name, gst in vendor_mapping.items():
 
         cleaned_vendor = vendor_name.upper().strip().replace("&", "AND").replace(",", "").replace(".", "")
-        score = SequenceMatcher(None, sample_vendor_name, cleaned_vendor).ratio()
+        cleanedvendowNameLen=len(cleaned_vendor)
+        score = SequenceMatcher(None, sample_vendor_name[:cleanedvendowNameLen], cleaned_vendor).ratio()
 
         if score > best_score:
             best_score = score
