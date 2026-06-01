@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+from rapidfuzz import fuzz
 
 
 def clean_value(value):
@@ -269,7 +270,7 @@ import json
 from difflib import SequenceMatcher
 import os
 
-def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.92):
+def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=94):
     """
     Reads vendor->GST JSON mapping
     and returns GST if vendor name matches > threshold.
@@ -299,12 +300,16 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=0.92):
 
         cleaned_vendor = vendor_name.upper().strip().replace("&", "AND").replace(",", "").replace(".", "")
         cleanedvendowNameLen=len(cleaned_vendor)
-        score = SequenceMatcher(None, sample_vendor_name[:cleanedvendowNameLen], cleaned_vendor).ratio()
+        score = fuzz.ratio(sample_vendor_name[:cleanedvendowNameLen], cleaned_vendor)
 
         if score > best_score:
             best_score = score
             best_match = gst
             Vendor_Name=vendor_name
+
+        if score >= 98:
+            print(f"Exact match found for vendor name: `{vendor_name}` with score {score}. Returning early")
+            return gst, vendor_name
 
     print(f"Best Match Score: `{best_score}`, with vendor name: `{Vendor_Name}`")
 
