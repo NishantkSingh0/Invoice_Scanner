@@ -18,6 +18,7 @@ export default function UploadImage() {
 
   const isBank = key_name === "bank";
   const isSalesOrder = key_name === "SalesOrder";
+  const isMaterialRequisition = key_name === "MaterialRequisition";
 
   // const Backend_url = "https://invoice-scanner-7hgz.vercel.app/";        
   const Backend_url = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000/";
@@ -48,6 +49,31 @@ export default function UploadImage() {
       if (selected.type !== validMimeType) {
 
         toast.error("Only .xlsx files allowed ❌");
+
+        return;
+      }
+    }
+
+    // Material Requisition Validation
+    if (isMaterialRequisition) {
+
+      const validTypes = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/jpg"
+      ];
+
+      const fileName = selected.name.toLowerCase();
+      const isValidType = validTypes.includes(selected.type) || 
+                          fileName.endsWith('.pdf') ||
+                          fileName.endsWith('.png') ||
+                          fileName.endsWith('.jpeg') ||
+                          fileName.endsWith('.jpg');
+
+      if (!isValidType) {
+
+        toast.error("Only PDF, PNG, JPEG, JPG files allowed ❌");
 
         return;
       }
@@ -117,7 +143,7 @@ export default function UploadImage() {
 
     formData.append("file", file);
 
-    if (!isBank && !isSalesOrder) {
+    if (!isBank && !isSalesOrder && !isMaterialRequisition) {
 
       formData.append(
         "KeyName",
@@ -137,6 +163,12 @@ export default function UploadImage() {
     else if (isSalesOrder) {
 
       endpoint = `${Backend_url}Sales-Order/`;
+    }
+
+    // Material Requisition
+    else if (isMaterialRequisition) {
+
+      endpoint = `${Backend_url}Material-Requisition/`;
     }
 
     // PDF
@@ -175,9 +207,11 @@ export default function UploadImage() {
           ? "CSV Rendered Successfully ✅"
           : isSalesOrder
             ? "Sales Order Rendered Successfully ✅"
-            : file.type === "application/pdf"
-              ? "PDF Rendered Successfully ✅"
-              : "Image Rendered Successfully ✅"
+            : isMaterialRequisition
+              ? "Material Requisition Rendered Successfully ✅"
+              : file.type === "application/pdf"
+                ? "PDF Rendered Successfully ✅"
+                : "Image Rendered Successfully ✅"
       );
 
       setFile(null);
@@ -193,9 +227,11 @@ export default function UploadImage() {
           ? "Failed To Upload CSV ❌"
           : isSalesOrder
             ? "Failed To Upload Sales Order ❌"
-            : file.type === "application/pdf"
-              ? "Failed To Upload PDF ❌"
-              : "Failed To Upload Image ❌"
+            : isMaterialRequisition
+              ? "Failed To Upload Material Requisition ❌"
+              : file.type === "application/pdf"
+                ? "Failed To Upload PDF ❌"
+                : "Failed To Upload Image ❌"
       );
 
     } finally {
@@ -319,7 +355,9 @@ export default function UploadImage() {
           {
             isSalesOrder
               ? "Upload Sales Order XLSX"
-              : <>Upload or Capture Image/PDF of <br /> ({key_name} invoice)</>
+              : isMaterialRequisition
+                ? "Upload Material Requisition"
+                : <>Upload or Capture Image/PDF of <br /> ({key_name} invoice)</>
           }
 
         </h1>
@@ -331,7 +369,9 @@ export default function UploadImage() {
           accept={
             isSalesOrder
               ? ".xlsx"
-              : "image/*,.pdf,application/pdf"
+              : isMaterialRequisition
+                ? ".pdf,.png,.jpeg,.jpg,image/png,image/jpeg,application/pdf"
+                : "image/*,.pdf,application/pdf"
           }
           onChange={handleFileChange}
           onClick={(e) => { e.target.value = null; }}
@@ -371,14 +411,15 @@ export default function UploadImage() {
             {
               isSalesOrder
                 ? "Upload XLSX"
-                : "Upload Image / PDF"
+                : isMaterialRequisition
+                  ? "Upload File"
+                  : "Upload Image / PDF"
             }
 
           </button>
 
           {
             !isSalesOrder && (
-
               <button
                 disabled={loading}
                 onClick={openCamera}

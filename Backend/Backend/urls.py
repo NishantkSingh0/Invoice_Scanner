@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path
-from .views import render, login, verify_token, render_csv, render_pdf, upload_excel
+from .views import render, login, verify_token, render_csv, render_pdf, upload_excel, RenderMaterialRequisition
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -10,4 +10,5 @@ urlpatterns = [
     path('login/', login),
     path('verify-token/', verify_token),
     path('Sales-Order/', upload_excel),
+    path('Material-Requisition/', RenderMaterialRequisition),
 ]

@@ -23,6 +23,7 @@ PURCHASE_SHEET_NAME="Mixedtest"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
+MATERIAL_REQUISITION_SHEET="MaterialRequisition"
 
 def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
@@ -163,6 +164,53 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
     except Exception as e:
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message
+
+
+def process_Material_requisition(base64_image, content_type, SheetID, sheet_name):
+    print("Processing Requisition image")
+    # print("Scceed Url: ", url)
+    llm_response = llama4(pr.MATERIAL_REQUISITION_PROMPT, base64_image, content_type)
+    if llm_response == "unable to parse":
+        raise ValueError("LLM failed to parse the invoice image. Check your GROQ_API_KEY and model availability.")
+    output = json.loads(llm_response)
+    url=bucket(base64_string=base64_image)
+    assert output != "unable to parse", "Unable to parse invoice"
+    print("Parsing Succeed",output)
+
+    success = True
+    try: 
+        temp = {
+            "Department_Name": output["Department_Name"],
+            "Date": output["Date"],
+            "Product_Name": output["Product_Name"],
+            "Quantity": output["Quantity"],
+            "Unit": output["Unit"],
+            "Last_purchased_price": output["Last_purchased_price"],
+            "Stock_in_Hand": output["Stock_in_Hand"],
+            "Vendor_Name": output["Vendor_Name"],
+            "IsApproved": output["IsApproved"],
+            "url": url
+        }
+        print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
+        if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2):
+            success = False
+            print(f"Failed to fill sheet for material requisition")
+    except Exception as e:
+        tempxvc={
+            "Department_Name": "Success: False",
+            "Date": "Error",
+            "Product_Name": e,
+            "Quantity": "Error",
+            "Unit": "Error",
+            "Last_purchased_price": "Error",
+            "Stock_in_Hand": "Error",
+            "Vendor_Name": "Error",
+            "IsApproved": "Error",
+            "url": url,
+        }
+        _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["Department_Name","Date","Product_Name","Quantity","Unit","Last_purchased_price","Stock_in_Hand","Vendor_Name","IsApproved","url"])
+        print(f"Error processing item: {e}")
+    return success
 
 
 def process_bank_csv(file_bytes, SheetID):
@@ -336,6 +384,52 @@ def render_csv(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    
+
+@csrf_exempt
+def RenderMaterialRequisition(request):
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+
+    file = request.FILES['file']
+    image_data = file.read()
+    base64_image = base64.b64encode(image_data).decode('utf-8')
+    try:
+        # Basic content-type guard (browsers may send text/csv or application/octet-stream)
+        if file.name.lower().endswith('.pdf'):
+            pdf_bytes = file.read()
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            total_pages = len(pdf_document)
+            print(f"Total Pages: {total_pages}")
+            all_success = True
+            for page_index in range(total_pages):
+                print(f"Processing Page {page_index + 1}")
+                page = pdf_document.load_page(page_index)
+                matrix = fitz.Matrix(2, 2)
+                pix = page.get_pixmap(matrix=matrix)
+                image_bytes = pix.tobytes("png")
+                base64_image = base64.b64encode(image_bytes).decode("utf-8")
+                content_type = "image/png"
+                success = process_Material_requisition(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_MATERIAL_REQUISITION'), sheet_name=MATERIAL_REQUISITION_SHEET)
+                if not success:
+                    all_success = False
+                    print(f"Failed on page {page_index + 1}")
+            
+            return JsonResponse({'success': all_success, 'message': 'Material Requisition processed successfully'})
+
+        elif file.name.lower().endswith('.png') or file.name.lower().endswith('.jpg') or file.name.lower().endswith('.jpeg'):
+            success = process_Material_requisition(base64_image, file.content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_MATERIAL_REQUISITION'), sheet_name=MATERIAL_REQUISITION_SHEET)
+            return JsonResponse({'success': success, 'message': 'Material Requisition processed successfully'})
+
+        else:
+            return JsonResponse({'error': 'Only PDF, JPG, JPEG Allowed files are accepted'}, status=400)
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
 
 
 @csrf_exempt

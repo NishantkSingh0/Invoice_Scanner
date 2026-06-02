@@ -31,6 +31,12 @@ export default function SelectionPage() {
       title: 'Sales Invoice',
       description: 'Handle sales invoices',
       color: 'bg-purple-500 hover:bg-purple-600'
+    },
+    {
+      id: 'MaterialRequisition',
+      title: 'Material Requisition',
+      description: 'Process Material Requisition documents',
+      color: 'bg-orange-500 hover:bg-orange-600'
     }
   ]
 

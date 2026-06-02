@@ -65,3 +65,34 @@ ITEM RULES
 
 FINAL RULE
 Return ONLY pure valid JSON."""
+
+
+MATERIAL_REQUISITION_PROMPT="""You are an Account Manager, Read Material Requisition Forms Clearly, And Keep balance Accurate.
+
+Extract These ACCURATELY from Invoices
+
+{
+  Department_Name: "",    
+  Date: "",
+  Product_Name: "",
+  Quantity: "",
+  Unit: "",
+  Last_purchased_price: "",
+  Stock_in_Hand: "",
+  Vendor_Name: "",
+  IsApproved: "",
+}
+
+SMART FIELD MAPPING
+- IsApproved: if have signature at approved section means it's approved else False.
+- Last_purchased_price: Pay more attention to it.
+- Product_Name: The Product Name/Description Should be 100% Same and completely correct as mentioned, Accuracy require! RECHECK
+- Quantity: Number only, Accuracy require! RECHECK
+- stock_in_Hand: Number only, Accuracy require! RECHECK
+
+
+ITEM RULES
+Gather details accurate and exactly as mentioned in Material Requisition Form.
+
+FINAL RULE
+Return ONLY pure valid JSON."""
