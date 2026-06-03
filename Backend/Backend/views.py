@@ -19,7 +19,7 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="Mixedtest"
+PURCHASE_SHEET_NAME="Purchase"
 SALES_SHEET_NAME="sales"
 BANK_SHEET_NAME="Bank"
 SALES_ORDER_SHEET_NAME="Sheet1"
@@ -67,6 +67,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
     """
     try:
         print("Processing image")
+        # print("Received sheet id: ", SheetID)
         # print("Scceed Url: ", url)
         llm_response = gemini_inference(pr.OCR_PROMPT, base64_image, content_type)
         if llm_response == "unable to parse":
@@ -128,7 +129,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "INVOICE_IMAGE": url
                 }
                 print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts, preRegisteredCells=preRegisteredCells)):
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=4, highlight_columns=detectAnomalyCells(temp, ProductCounts, preRegisteredCells=preRegisteredCells)):
                     success = False
                     print(f"Failed to fill sheet for item: {item}")
                     break  # Stop on first failure, or continue based on requirement
@@ -471,6 +472,7 @@ def render_pdf(request):
             if key_name == "purchase":
 
                 print("Navigating to Purchase")
+                
                 success = process_purchase_image(
                     base64_image,
                     content_type,

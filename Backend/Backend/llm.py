@@ -172,17 +172,18 @@ def llama4(
         )
 
 
-def gemini_inference(prompt, base64_image, content_type='image/jpeg', model="gemini-2.5-pro"):
+def gemini_inference(prompt, base64_image,
+                     content_type='image/jpeg',
+                     model="gemini-2.5-pro"):
 
+    text = ""
 
     try:
-        # Create model
         model = genai.GenerativeModel(
             model_name=model,
             system_instruction="""You are a Accountant who manages all purchase/Sales Records accurately"""
         )
 
-        # Generate response
         response = model.generate_content(
             contents=[
                 {
@@ -202,18 +203,19 @@ def gemini_inference(prompt, base64_image, content_type='image/jpeg', model="gem
 
         text = response.text.strip()
 
-        # Remove markdown if Gemini still returns it
         text = re.sub(r"^```json", "", text)
         text = re.sub(r"^```", "", text)
         text = re.sub(r"```$", "", text)
         text = text.strip()
-        json.loads(text)
-        return text
-    except Exception as e:
-        print("Gemini Returned Invalid JSON:")
-        print(text)
-        return "unable to parse"
 
+        json.loads(text)
+
+        return text
+
+    except Exception as e:
+        print("Gemini Error:", e)
+        print("Response Text:", text)
+        return "unable to parse"
 
 def extract_bank_transactions(csv_source):
     """
