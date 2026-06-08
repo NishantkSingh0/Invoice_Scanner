@@ -19,11 +19,11 @@ import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
 
-PURCHASE_SHEET_NAME="Purchase"
-SALES_SHEET_NAME="sales"
+PURCHASE_SHEET_NAME="PurchaseSheet"
+SALES_SHEET_NAME="SalesSheet"
 BANK_SHEET_NAME="Bank"
-SALES_ORDER_SHEET_NAME="Sheet1"
-MATERIAL_REQUISITION_SHEET="MaterialRequisition"
+SALES_ORDER_SHEET_NAME="SalesOrder"
+MATERIAL_REQUISITION_SHEET="SalesRequisition"
 
 def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
@@ -108,12 +108,12 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
                     "GR_DATE": output['GRDATE'],
-                    "VENDOR_NAME": vendorname,
+                    "VENDOR_NAME": vendorname.upper(),
                     "PO_NO": output['PO_NO'],
                     "INVOICE_NO": output['INVOICE_NO'],
                     "INVOICE_DATE": output['INVOICE_DATE'],
                     "GSTIN/UIN": GSTNum,
-                    "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                    "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'].upper(),
                     "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
                     "QTY": item['QUANTITY'],
                     "UNIT": item['UNIT'],
@@ -129,7 +129,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "INVOICE_IMAGE": url
                 }
                 print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
-                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=4, highlight_columns=detectAnomalyCells(temp, ProductCounts, preRegisteredCells=preRegisteredCells)):
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=detectAnomalyCells(temp, ProductCounts, preRegisteredCells=preRegisteredCells)):
                     success = False
                     print(f"Failed to fill sheet for item: {item}")
                     break  # Stop on first failure, or continue based on requirement
@@ -233,7 +233,6 @@ def process_bank_csv(file_bytes, SheetID):
 
         if not records:
             raise ValueError("No transaction records extracted from CSV")
-        print("calling fill_sheet_bulk to update Data")
         return fill_sheet_bulk(records, SheetID=SheetID, sheet_name=BANK_SHEET_NAME, header_row=2)
 
     except Exception as e:
@@ -296,12 +295,12 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
                     "GR_DATE": output['GRDATE'],
-                    "VENDOR_NAME": vendorname,
+                    "VENDOR_NAME": vendorname.upper(),
                     "PO_NO": output['PO_NO'],
                     "INVOICE_NO": output['INVOICE_NO'],
                     "INVOICE_DATE": output['INVOICE_DATE'],
                     "GSTIN/UIN": GSTNum,
-                    "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'],
+                    "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'].upper(),
                     "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
                     "QTY": item['QUANTITY'],
                     "UNIT": item['UNIT'],
@@ -348,7 +347,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                 _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["MONTH","FY","GR_DATE","VENDOR_NAME","PO_NO","INVOICE_NO","INVOICE_DATE","GSTIN/UIN","ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER","LEDGER_ACCOUNT","QTY","UNIT","ITEM_RATE","AMOUNT","DISCOUNT","HSN/SAC","CGST","SGST","IGST","TOTAL_TAX","TOTAL_AMOUNT"])
                 print(f"Error processing item: {e}")
                 continue
-            return success
+        return success
     except Exception as e:
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message

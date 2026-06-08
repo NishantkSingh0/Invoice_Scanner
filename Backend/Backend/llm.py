@@ -172,12 +172,9 @@ def llama4(
         )
 
 
-def gemini_inference(prompt, base64_image,
-                     content_type='image/jpeg',
-                     model="gemini-2.5-pro"):
+def gemini_inference(prompt, base64_image, content_type='image/jpeg', model="gemini-2.5-pro"):
 
     text = ""
-
     try:
         model = genai.GenerativeModel(
             model_name=model,
@@ -240,6 +237,7 @@ def extract_bank_transactions(csv_source):
     start_idx = None
 
     for i, line in enumerate(lines):
+        print("Text:", line)
         if "Sl. No." in line:
             start_idx = i
             break
