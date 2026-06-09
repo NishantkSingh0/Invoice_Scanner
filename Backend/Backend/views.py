@@ -93,7 +93,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     preRegisteredCells.append("CGST")
                     preRegisteredCells.append("SGST")
                     preRegisteredCells.append("IGST")
-
+                    
                 itemRate=item['ITEM_RATE'].replace(',','').replace('₹','').strip()
                 text=f"{item['CGST']} + {item['SGST']}"
                 DiscountedRate = str(itemRate).replace("'", ".") if item['DISCOUNT']=="NA" or item['DISCOUNT']=="NULL" else str(float(itemRate) * (1 - float(item['DISCOUNT'].replace("'", ".").replace('%','').strip())/100))
@@ -103,6 +103,10 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     Amount = item["ITEM_RATE"].replace(',','').replace('₹','').strip()
                 else:
                     Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
+                
+                CGSTamount=(float(item['CGST'].replace("NA","0").replace('%','').replace(' ',''))/100)*float(Amount.replace("NA","0")) if item['CGST'].strip() !="NULL" else "NULL"
+                SGSTamount=(float(item['SGST'].replace("NA","0").replace('%','').replace(' ',''))/100)*float(Amount.replace("NA","0")) if item['CGST'].strip() !="NULL" else "NULL"
+                # print(CGSTamount, SGSTamount, Amount, GSTTOTAL)
 
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
@@ -120,11 +124,12 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "ITEM_RATE": itemRate if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
                     "AMOUNT": f"{float(Amount):.2f}" if Amount.strip() != "NA" else "NA",
                     "DISCOUNT": item['DISCOUNT'],
+                    "GST RATE": str(float(item['CGST'].replace("NA","0").replace('%','')) + float(item['SGST'].replace("NA","0").replace('%',''))) + " %",
                     "HSN/SAC": item['HSN/SAC'],
-                    "CGST": item['CGST'] if GSTNum.startswith("09") else "NA",
-                    "SGST": item['SGST'] if GSTNum.startswith("09") else "NA",
-                    "IGST": f"{item['CGST']} + {item['SGST']}" if not GSTNum.startswith("09") else "NA",
-                    "TOTAL_TAX": GSTTOTAL if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*float(GSTTOTAL)/100,
+                    "CGST": CGSTamount if GSTNum.startswith("09") else "NA",
+                    "SGST": SGSTamount if GSTNum.startswith("09") else "NA",
+                    "IGST": CGSTamount + SGSTamount if not GSTNum.startswith("09") else "NA",
+                    "TOTAL_TAX": CGSTamount + SGSTamount, 
                     "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
                     "INVOICE_IMAGE": url
                 }

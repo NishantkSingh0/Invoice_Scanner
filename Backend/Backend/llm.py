@@ -178,7 +178,16 @@ def gemini_inference(prompt, base64_image, content_type='image/jpeg', model="gem
     try:
         model = genai.GenerativeModel(
             model_name=model,
-            system_instruction="""You are a Accountant who manages all purchase/Sales Records accurately"""
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0
+            },
+            system_instruction="""You are a Accountant who manages all purchase/Sales Records accurately
+            Extract the fields exactly as they appear in the document.
+                Do not infer missing values.
+                Do not verify calculations.
+                Do not perform audits.
+                Return only JSON."""
         )
 
         response = model.generate_content(
