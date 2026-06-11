@@ -12,7 +12,6 @@ import os
 import io
 from dotenv import load_dotenv
 from googleapiclient.http import MediaIoBaseUpload
-from weasyprint import HTML
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from .bucketHandling import upload_pdf_base64
@@ -150,10 +149,18 @@ def generate_job_card_pdf(data: dict) -> str:
 
     rendered_html = env.get_template("jobcard.html").render(**data)
 
-    pdf_bytes = HTML(
-        string=rendered_html,
-        base_url=str(template_dir)
-    ).write_pdf()
+    pdf_buffer = BytesIO()
+
+    pisa_status = pisa.CreatePDF(
+        src=rendered_html,
+        dest=pdf_buffer,
+        encoding="utf-8"
+    )
+
+    if pisa_status.err:
+        raise Exception("Failed to generate PDF")
+
+    pdf_bytes = pdf_buffer.getvalue()
 
     return base64.b64encode(pdf_bytes).decode("utf-8")
 
