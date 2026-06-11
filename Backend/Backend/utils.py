@@ -15,6 +15,7 @@ from googleapiclient.http import MediaIoBaseUpload
 from weasyprint import HTML
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from .bucketHandling import upload_pdf_base64
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 load_dotenv()
 
@@ -132,7 +133,7 @@ def extract_table(df, header_row):
 
 
 def generate_job_card_pdf(data: dict) -> str:
-    template_dir = Path(settings.BASE_DIR) / "template"
+    template_dir = Path(__file__).resolve().parent / "template"
 
     if data.get("ref_image"):
         image = data["ref_image"]
@@ -199,34 +200,6 @@ def drive_image_to_base64(drive_url: str) -> str:
     except Exception as e:
         print(f"Error in drive_image_to_base64: {e}")
         return None
-
-
-def upload_pdf_to_drive(pdf_base64: str, folder_id: str, file_name: str = "document.pdf") -> str:
-    """
-    Upload a Base64 PDF directly to Google Drive.
-    Returns the Drive view URL.
-    """
-
-    service = _drive_service()
-
-    pdf_bytes = base64.b64decode(pdf_base64)
-
-    media = MediaIoBaseUpload(
-        io.BytesIO(pdf_bytes),
-        mimetype="application/pdf",
-        resumable=True
-    )
-
-    file = service.files().create(
-        body={
-            "name": file_name,
-            "parents": [folder_id]
-        },
-        media_body=media,
-        fields="id"
-    ).execute()
-
-    return f"https://drive.google.com/file/d/{file['id']}/view"
 
 
 def process_excel(file_path):
@@ -335,7 +308,7 @@ def RefineSalesOrderData(data):
                 "Specifications": item.get("SPECIFICATIONS"),
                 "ref_image": base64
             })
-            jobCardUrl = upload_pdf_to_drive(pdf_base64=JobCard, folder_id=os.getenv("GOOGLE_DRIVE_FOLDER_ID_JOB_CARDS"))
+            jobCardUrl = upload_pdf_base64(base64_pdf=JobCard)
         except Exception as e:
             print(f"Error generating/uploading Job Card for product {product_name}: {e}")
             jobCardUrl = f"Error: {e}"
