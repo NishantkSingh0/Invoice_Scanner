@@ -76,25 +76,20 @@ def bucket(base64_string: str, file_name: str = "inv"):
     return response.url
 
 
-def upload_pdf_base64(base64_pdf: str, file_name: str = "inv"):
+def upload_pdf_buffer(pdf_buffer, file_name: str = "inv"):
     print("PDF Upload called")
 
     imagekit = ImageKit(
         private_key=os.getenv("IMAGEKIT_PRIVATE_KEY")
     )
 
-    if base64_pdf.startswith("data:application/pdf;base64,"):
-        base64_pdf = base64_pdf.split(",", 1)[1]
-
-    pdf_bytes = base64.b64decode(base64_pdf)
+    pdf_buffer.seek(0)
 
     response = imagekit.files.upload(
-        file=pdf_bytes,
+        file=pdf_buffer.read(),
         file_name=f"{file_name}.pdf",
         folder="/inv",
         use_unique_file_name=True
     )
-
-    # print("Response:", response.url)
 
     return response.url

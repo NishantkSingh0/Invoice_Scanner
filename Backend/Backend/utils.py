@@ -15,7 +15,7 @@ from googleapiclient.http import MediaIoBaseUpload
 from weasyprint import HTML
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from .bucketHandling import upload_pdf_base64
+from .bucketHandling import upload_pdf_buffer
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 load_dotenv()
 
@@ -132,16 +132,24 @@ def extract_table(df, header_row):
 
 
 
-def generate_job_card_pdf(data: dict) -> str:
+import tempfile
+
+def generate_job_card_pdf(data: dict):
     template_dir = Path(__file__).resolve().parent / "template"
 
+    temp_image_path = None
+
     if data.get("ref_image"):
-        image = data["ref_image"]
+        image_buffer = data["ref_image"]
 
-        if not image.startswith("data:image"):
-            image = f"data:image/png;base64,{image}"
+        with tempfile.NamedTemporaryFile(
+            suffix=".png",
+            delete=False
+        ) as temp_img:
+            temp_img.write(image_buffer.getvalue())
+            temp_image_path = temp_img.name
 
-        data["ref_image"] = image
+        data["ref_image"] = f"file://{temp_image_path}"
 
     env = Environment(
         loader=FileSystemLoader(template_dir),
@@ -150,12 +158,19 @@ def generate_job_card_pdf(data: dict) -> str:
 
     rendered_html = env.get_template("jobcard.html").render(**data)
 
-    pdf_bytes = HTML(
+    pdf_buffer = io.BytesIO()
+
+    HTML(
         string=rendered_html,
         base_url=str(template_dir)
-    ).write_pdf()
+    ).write_pdf(pdf_buffer)
 
-    return base64.b64encode(pdf_bytes).decode("utf-8")
+    pdf_buffer.seek(0)
+
+    if temp_image_path and os.path.exists(temp_image_path):
+        os.remove(temp_image_path)
+
+    return pdf_buffer
 
 
 def _drive_service():
@@ -167,9 +182,9 @@ def _drive_service():
     return build("drive", "v3", credentials=credentials)
 
 
-def drive_image_to_base64(drive_url: str) -> str:
+def drive_image_to_buffer(drive_url: str):
     """
-    Read image from Google Drive URL and return Base64 string.
+    Read image from Google Drive URL and return BytesIO buffer.
     """
     if not drive_url or not isinstance(drive_url, str):
         return None
@@ -181,6 +196,7 @@ def drive_image_to_base64(drive_url: str) -> str:
             r"/file/d/([^/]+)|id=([^&]+)",
             drive_url
         )
+
         if not file_id:
             print(f"No Google Drive file ID found in URL: {drive_url}")
             return None
@@ -196,9 +212,12 @@ def drive_image_to_base64(drive_url: str) -> str:
         while not done:
             _, done = downloader.next_chunk()
 
-        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+        buffer.seek(0)
+
+        return buffer
+
     except Exception as e:
-        print(f"Error in drive_image_to_base64: {e}")
+        print(f"Error in drive_image_to_buffer: {e}")
         return None
 
 
@@ -292,7 +311,7 @@ def RefineSalesOrderData(data):
             base64 = None
         else:
             try:
-                base64 = drive_image_to_base64(drive_url=drive_url.strip())
+                base64 = drive_image_to_buffer(drive_url=drive_url.strip())
             except Exception as e:
                 print(f"Error converting drive image to base64: {e}")
                 base64 = None
@@ -308,7 +327,7 @@ def RefineSalesOrderData(data):
                 "Specifications": item.get("SPECIFICATIONS"),
                 "ref_image": base64
             })
-            jobCardUrl = upload_pdf_base64(base64_pdf=JobCard)
+            jobCardUrl = upload_pdf_buffer(pdf_buffer=JobCard)
         except Exception as e:
             print(f"Error generating/uploading Job Card for product {product_name}: {e}")
             jobCardUrl = f"Error: {e}"
