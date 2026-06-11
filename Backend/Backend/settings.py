@@ -23,10 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-7xru&!4hy-o=#ptygctmivus$=_(qzp)9glm8g0pt-sa-4$3mp'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-7xru&!4hy-o=#ptygctmivus$=_(qzp)9glm8g0pt-sa-4$3mp')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG")
+DEBUG = os.getenv("DEBUG", "False").strip().lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = [
     ".vercel.app",
@@ -88,6 +88,14 @@ DATABASES = {
     }
 }
 
+# Cache — file-based so tokens survive Gunicorn worker restarts
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": BASE_DIR / ".django_cache",
+    }
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -135,4 +143,16 @@ CORS_ALLOWED_ORIGINS = [
     "https://invoice-scanner-inky.vercel.app",
     "http://localhost:5173",
     "http://localhost:5174"
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]

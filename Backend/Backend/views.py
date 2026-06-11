@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.core.cache import cache
 from .llm import llama4, extract_bank_transactions, gemini_inference
 from . import utils as ut
 from . import prompt as pr
@@ -560,8 +561,10 @@ def render(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-# Simple in-memory token storage (for production, use database)
-_auth_tokens = {}
+TOKEN_CACHE_TIMEOUT = 7 * 24 * 60 * 60  # 7 days in seconds
+
+def _token_key(token):
+    return f"auth_token_{token}"
 
 def validate_credentials(user_id, password):
     """
@@ -597,11 +600,12 @@ def login(request):
         if validate_credentials(user_id, password):
             # Generate auth token
             token = secrets.token_urlsafe(32)
-            _auth_tokens[token] = {
+            token_data = {
                 'user_id': user_id,
-                'created_at': datetime.now(),
-                'expires_at': datetime.now() + timedelta(days=7)
+                'created_at': datetime.now().isoformat(),
+                'expires_at': (datetime.now() + timedelta(days=7)).isoformat()
             }
+            cache.set(_token_key(token), token_data, TOKEN_CACHE_TIMEOUT)
             
             return JsonResponse({
                 'status': 'success',
@@ -636,12 +640,13 @@ def verify_token(request):
         if not token:
             return JsonResponse({'error': 'token is required'}, status=400)
         
-        if token in _auth_tokens:
-            token_data = _auth_tokens[token]
-            
+        token_data = cache.get(_token_key(token))
+
+        if token_data:
             # Check if token is expired
-            if token_data['expires_at'] < datetime.now():
-                del _auth_tokens[token]
+            expires_at = datetime.fromisoformat(token_data['expires_at'])
+            if expires_at < datetime.now():
+                cache.delete(_token_key(token))
                 return JsonResponse({
                     'status': 'failed',
                     'error': 'Token expired'

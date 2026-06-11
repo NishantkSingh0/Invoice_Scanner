@@ -1,0 +1,27 @@
+The following environment variables MUST be set in Render's dashboard under "Environment":
+
+# ----- AUTH -----
+EMP_ID=<your_employee_id>
+PASSWORD=<your_password>
+SECRET_KEY=<generate a new secure key>
+
+# ----- GOOGLE SHEETS -----
+GOOGLE_CREDENTIAL=<JSON string of service account credentials>
+GOOGLE_SHEET_ID_PURCHASE=<sheet_id>
+GOOGLE_SHEET_ID_SALES=<sheet_id>
+GOOGLE_SHEET_ID_BANK=<sheet_id>
+GOOGLE_SHEET_ID_SALES_ORDER=<sheet_id>
+GOOGLE_SHEET_ID_MATERIAL_REQUISITION=<sheet_id>
+
+# ----- GOOGLE DRIVE -----
+GOOGLE_DRIVE_CREDENTIAL=<JSON string of drive service account credentials>
+
+# ----- IMAGEKIT -----
+IMAGEKIT_PRIVATE_KEY=<your_imagekit_private_key>
+
+# ----- LLM -----
+GROQ_API_KEY=<your_groq_api_key>
+GOOGLE_API_KEY=<your_google_api_key>
+
+# ----- DJANGO -----
+DEBUG=False
