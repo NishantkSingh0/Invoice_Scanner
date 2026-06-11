@@ -1,7 +1,22 @@
 import pandas as pd
 import re
+import requests
+from pathlib import Path
+from django.conf import settings
 from rapidfuzz import fuzz
-
+from jinja2 import Environment, BaseLoader
+from jinja2 import Environment, FileSystemLoader
+import base64
+import json
+import os
+import io
+from dotenv import load_dotenv
+from googleapiclient.http import MediaIoBaseUpload
+from weasyprint import HTML
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+load_dotenv()
 
 def clean_value(value):
     """
@@ -13,18 +28,10 @@ def clean_value(value):
     return str(value).strip()
 
 
-def extract_metadata(df, max_rows=10):
-    """
-    Extracts unstructured metadata
-    from top rows into dictionary
-    """
-
+def extract_metadata(df):
     metadata = {}
 
-    # Read only top section
-    top_df = df.iloc[:max_rows]
-
-    for _, row in top_df.iterrows():
+    for _, row in df.iterrows():
 
         row_values = [
             clean_value(v)
@@ -35,21 +42,21 @@ def extract_metadata(df, max_rows=10):
         if len(row_values) < 2:
             continue
 
-        # Try detecting key-value pattern
         for i in range(len(row_values) - 1):
 
             key = row_values[i]
-            value = row_values[i + 1]
 
-            # Avoid useless keys
-            if len(key) > 50:
+            if len(str(key)) > 50:
                 continue
 
-            # Normalize key
+            value = row_values[i + 1]
+
             normalized_key = (
-                key.upper()
+                str(key)
+                .upper()
                 .replace(" ", "_")
                 .replace(":", "")
+                .strip()
             )
 
             metadata[normalized_key] = value
@@ -112,36 +119,122 @@ def extract_table(df, header_row):
     table_df = table_df.dropna(how="all")
     table_df = table_df.dropna(axis=1, how="all")
 
-    # Optional important columns
-    important_columns = [
-        "MODEL NUMBER",
-        "PRODUCT NAME",
-        "QUANTITY",
-        "UPHOLSTERY / STONE FINISH",
-        "RATE",
-        "TOTAL",
-        "SPECIFICATIONS",
+    table_df.columns = [
+        str(col)
+        .strip()
+        .replace("\n", " ")
+        .replace("\r", " ")
+        .upper()
+        for col in table_df.columns
     ]
-
-    available_columns = [
-        col for col in important_columns
-        if col in table_df.columns
-    ]
-
-    if available_columns:
-        table_df = table_df[available_columns]
-
     return table_df.reset_index(drop=True)
+
+
+
+def generate_job_card_pdf(data: dict) -> str:
+    template_dir = Path(settings.BASE_DIR) / "template"
+
+    if data.get("ref_image"):
+        image = data["ref_image"]
+
+        if not image.startswith("data:image"):
+            image = f"data:image/png;base64,{image}"
+
+        data["ref_image"] = image
+
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=True
+    )
+
+    rendered_html = env.get_template("jobcard.html").render(**data)
+
+    pdf_bytes = HTML(
+        string=rendered_html,
+        base_url=str(template_dir)
+    ).write_pdf()
+
+    return base64.b64encode(pdf_bytes).decode("utf-8")
+
+
+def _drive_service():
+    credentials = service_account.Credentials.from_service_account_info(
+        json.loads(os.environ["GOOGLE_DRIVE_CREDENTIAL"]),
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+
+    return build("drive", "v3", credentials=credentials)
+
+
+def drive_image_to_base64(drive_url: str) -> str:
+    """
+    Read image from Google Drive URL and return Base64 string.
+    """
+    if not drive_url or not isinstance(drive_url, str):
+        return None
+
+    try:
+        service = _drive_service()
+
+        file_id = re.search(
+            r"/file/d/([^/]+)|id=([^&]+)",
+            drive_url
+        )
+        if not file_id:
+            print(f"No Google Drive file ID found in URL: {drive_url}")
+            return None
+
+        file_id = next(g for g in file_id.groups() if g)
+
+        request = service.files().get_media(fileId=file_id)
+
+        buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(buffer, request)
+
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    except Exception as e:
+        print(f"Error in drive_image_to_base64: {e}")
+        return None
+
+
+def upload_pdf_to_drive(pdf_base64: str, folder_id: str, file_name: str = "document.pdf") -> str:
+    """
+    Upload a Base64 PDF directly to Google Drive.
+    Returns the Drive view URL.
+    """
+
+    service = _drive_service()
+
+    pdf_bytes = base64.b64decode(pdf_base64)
+
+    media = MediaIoBaseUpload(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        resumable=True
+    )
+
+    file = service.files().create(
+        body={
+            "name": file_name,
+            "parents": [folder_id]
+        },
+        media_body=media,
+        fields="id"
+    ).execute()
+
+    return f"https://drive.google.com/file/d/{file['id']}/view"
 
 
 def process_excel(file_path):
 
     excel = pd.ExcelFile(file_path)
-
     final_output = []
 
     for sheet_name in excel.sheet_names:
-
         print(f"\nProcessing Sheet: {sheet_name}")
 
         raw_df = pd.read_excel(
@@ -150,15 +243,10 @@ def process_excel(file_path):
             header=None
         )
 
-        # Skip empty sheets
         if raw_df.dropna(how="all").empty:
             print("Skipped Empty Sheet")
             continue
 
-        # Extract metadata
-        metadata = extract_metadata(raw_df)
-
-        # Detect table
         header_row = detect_table_header(raw_df)
 
         if header_row is None:
@@ -167,108 +255,115 @@ def process_excel(file_path):
 
         print(f"Table detected at row {header_row}")
 
-        # Extract structured table
-        table_df = extract_table(raw_df, header_row)
+        # Only read metadata above header row
+        metadata = extract_metadata(
+            raw_df.iloc[:header_row]
+        )
 
-        final_output.append({
-            "sheet_name": sheet_name,
-            "metadata": metadata,
-            "table_data": table_df
-        })
+        table_df = extract_table(
+            raw_df,
+            header_row
+        )
+
+        print("Detected Columns:")
+        print(table_df.columns.tolist())
+
+        final_output.append(
+            {
+                "sheet_name": sheet_name,
+                "metadata": metadata,
+                "table_data": table_df
+            }
+        )
 
     return final_output
 
 
-def RefineSalesOrderData(data):
+def get_value(data, *keys):
+    for key in keys:
+        if key in data and data[key] not in [None, ""]:
+            return data[key]
+    return None
 
+
+def clean_cell(value, default=""):
+    if pd.isna(value) or value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return value
+    return str(value).strip()
+
+
+def RefineSalesOrderData(data):
     metadata = data["metadata"]
     table_data = data["table_data"]
-
     rows = []
 
     # If table_data is DataFrame
     if isinstance(table_data, pd.DataFrame):
+        table_data = table_data.to_dict(orient="records")
 
-        table_data = table_data.to_dict(
-            orient="records"
-        )
-
+    delivery_address = clean_cell(metadata.get("Delivery_Address")).replace("\n", " ").replace("\r", " ").strip()
     for item in table_data:
-
-        product_name = str(
-            item.get("PRODUCT NAME", "")
-        ).strip().upper()
-
-        model_number = str(
-            item.get("MODEL NUMBER", "")
-        ).strip().upper()
-
-        rate_value = str(
-            item.get("RATE", "")
-        ).strip().upper()
+        product_name = str(item.get("PRODUCT_NAME")).strip().upper()
+        model_number = str(item.get("MODEL_NUMBER")).strip().upper()
+        rate_value = str(item.get("RATE", "")).strip().upper()
 
         # Skip summary rows
-        if (
-            product_name in ["NAN", ""]
-            or model_number in ["NAN", ""]
-            or "TOTAL" in rate_value
-            or "GST" in rate_value
-        ):
+        if product_name in ["NAN", ""] or model_number in ["NAN", ""] or "TOTAL" in rate_value or "GST" in rate_value:
             continue
 
+        drive_url = item.get("LAYOUT_RENDER_URL")
+        # Handle nan / None / non-string / empty values
+        if pd.isna(drive_url) or not isinstance(drive_url, str) or not drive_url.strip():
+            base64 = None
+        else:
+            try:
+                base64 = drive_image_to_base64(drive_url=drive_url.strip())
+            except Exception as e:
+                print(f"Error converting drive image to base64: {e}")
+                base64 = None
+
+        jobCardUrl = "NA"
+        try:
+            JobCard = generate_job_card_pdf(data={
+                "client_name": get_value(metadata, "Billing_Name", "BILLING_NAME"),
+                "po_number": get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO"),
+                "item_name": item.get("PRODUCT_NAME"),
+                "quantity": item.get("QUANTITY"),
+                "card_date": get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL"),
+                "Specifications": item.get("SPECIFICATIONS"),
+                "ref_image": base64
+            })
+            jobCardUrl = upload_pdf_to_drive(pdf_base64=JobCard, folder_id=os.getenv("GOOGLE_DRIVE_FOLDER_ID_JOB_CARDS"))
+        except Exception as e:
+            print(f"Error generating/uploading Job Card for product {product_name}: {e}")
+            jobCardUrl = f"Error: {e}"
+
         row = {
-
-            # Metadata fields
-            "Billing_Name":
-                metadata.get("BILLING_NAME_"),
-
-            "Billing_Address":
-                metadata.get("BILLING_ADDRESS_"),
-
-            "GST":
-                metadata.get("GST_"),
-
-            "Delivery_Address":
-                metadata.get("DELIVERY_ADDRESS_"),
-
-            "PO_Num":
-                metadata.get("PURCHASE_ORDER_NO_"),
-
-            "PO_Valid_Till":
-                metadata.get("PO_VALID_TILL"),
-
-            "Order_Type":
-                metadata.get("ORDER_TYPE_"),
-
-            # Product fields
-            "Product_Name":
-                item.get("PRODUCT NAME"),
-
-            "Model_Number":
-                item.get("MODEL NUMBER"),
-
-            "QTY":
-                item.get("QUANTITY"),
-
-            "Rate":
-                item.get("RATE"),
-
-            "Total":
-                item.get("TOTAL"),
-
-            "Specifications":
-                item.get("SPECIFICATIONS"),
+            "Billing_Name": get_value(metadata, "Billing_Name", "BILLING_NAME"),
+            "Billing_Address": get_value(metadata, "Billing_Address", "BILLING_ADDRESS"),
+            "GST": get_value(metadata, "GST"),
+            "Delivery_Address": delivery_address,
+            "RENDER_URL": clean_cell(item.get("RENDER_URL")),
+            "PO_Num": get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO"),
+            "PO_Valid_Till": get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL"),
+            "Order_Type": get_value(metadata, "Order_Type", "ORDER_TYPE"),
+            "Product_Name": clean_cell(item.get("PRODUCT_NAME")),
+            "Model_Number": clean_cell(item.get("MODEL_NUMBER")),
+            "QTY": clean_cell(item.get("QUANTITY")),
+            "Rate": clean_cell(item.get("RATE")),
+            "Total": clean_cell(item.get("TOTAL")),
+            "Specifications": clean_cell(item.get("SPECIFICATIONS")),
+            "LAYOUT_RENDER_URL": clean_cell(item.get("LAYOUT_RENDER_URL")),
+            "UPHOLSTERY/STONE_FINISH": clean_cell(item.get("UPHOLSTERY/STONE_FINISH")).replace("\n", " ").replace("\r", " "),
+            "CAD_urls": get_value(item, "CAD_urls", "CAD_URLS"),
+            "Job_Card_Url": jobCardUrl
         }
-
         rows.append(row)
-
     return rows
 
 
-
-import json
-from difflib import SequenceMatcher
-import os
 
 def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=94):
     """
@@ -319,3 +414,4 @@ def find_gst_by_vendor(sample_vendor_name, GSTNum, threshold=94):
     else:
         print(f"No matching vendor found with score >= {threshold}.")
         return GSTNum, sample_vendor_name
+    

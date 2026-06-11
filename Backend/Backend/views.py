@@ -665,80 +665,28 @@ def verify_token(request):
 
 @api_view(["POST"])
 def upload_excel(request):
-
     try:
-
-        # Get uploaded file
         excel_file = request.FILES.get("file")
-
         if not excel_file:
+            return Response({"success": False,"message": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response(
-                {
-                    "success": False,
-                    "message": "No file uploaded"
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Read fully in RAM
-        file_bytes = io.BytesIO(
-            excel_file.read()
-        )
-
-        # Parse Excel
-        parsed_data = ut.process_excel(
-            file_path=file_bytes
-        )
-
+        file_bytes = io.BytesIO(excel_file.read())
+        parsed_data = ut.process_excel(file_path=file_bytes)
         all_success = True
+        # print(f"Parsed Excel Data: {parsed_data}")
 
         for i in range(len(parsed_data)):
-
-            # Process SINGLE sheet
-            processedData = ut.RefineSalesOrderData(
-                parsed_data[i]
-            )
-
-            # Write to Google Sheet
-            is_success = fill_sheet_bulk(processedData,SheetID=os.getenv("GOOGLE_SHEET_ID_SALES_ORDER"),header_row=8, sheet_name=SALES_ORDER_SHEET_NAME)
-
-            print(
-                f"Sheet {i} write success: "
-                f"{is_success}"
-            )
-
+            processedData = ut.RefineSalesOrderData(parsed_data[i])
+            is_success = fill_sheet_bulk(processedData, SheetID=os.getenv("GOOGLE_SHEET_ID_SALES_ORDER"), header_row=8, sheet_name=SALES_ORDER_SHEET_NAME)
+            print(f"Sheet {i} write success: {is_success}")
             if not is_success:
                 all_success = False
 
-        # FINAL SUCCESS
         if all_success:
-
-            return Response(
-                {
-                    "success": True,
-                    "message":
-                        "Sales Order Uploaded Successfully"
-                },
-                status=status.HTTP_200_OK
-            )
-
-        # PARTIAL FAILURE
-        return Response(
-            {
-                "success": False,
-                "message":
-                    "Some sheets failed to upload"
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+            return Response({"success": True, "message": "Sales Order Uploaded Successfully"},status=status.HTTP_200_OK)
+        return Response({"success": False, "message":"Some sheets failed to upload"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
-
-        return Response(
-            {
-                "success": False,
-                "message": str(e)
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        import traceback
+        traceback.print_exc()
+        return Response({ "success": False, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
