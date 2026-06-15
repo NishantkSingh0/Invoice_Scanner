@@ -127,9 +127,9 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                     "DISCOUNT": item['DISCOUNT'],
                     "GST RATE": str(float(item['CGST'].replace("NA","0").replace('%','')) + float(item['SGST'].replace("NA","0").replace('%',''))) + " %",
                     "HSN/SAC": item['HSN/SAC'],
-                    "CGST": CGSTamount if GSTNum.startswith("09") else "NA",
-                    "SGST": SGSTamount if GSTNum.startswith("09") else "NA",
-                    "IGST": CGSTamount + SGSTamount if not GSTNum.startswith("09") else "NA",
+                    "CGST": CGSTamount if GSTNum.startswith("09") else "0",
+                    "SGST": SGSTamount if GSTNum.startswith("09") else "0",
+                    "IGST": CGSTamount + SGSTamount if not GSTNum.startswith("09") else "0",
                     "TOTAL_TAX": CGSTamount + SGSTamount, 
                     "TOTAL_AMOUNT": "Imp Details Missing" if GSTTOTAL.startswith("NA") or Amount.startswith("NA") else float(Amount)*(1 + float(GSTTOTAL)/100),
                     "INVOICE_IMAGE": url
