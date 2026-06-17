@@ -668,30 +668,35 @@ def verify_token(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 
+# @api_view(["POST"])
+# def upload_excel(request):
+#     try:
+#         excel_file = request.FILES.get("file")
+#         if not excel_file:
+#             return Response({"success": False,"message": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         file_bytes = io.BytesIO(excel_file.read())
+#         parsed_data = ut.process_excel(file_path=file_bytes)
+#         all_success = True
+#         # print(f"Parsed Excel Data: {parsed_data}")
+
+#         for i in range(len(parsed_data)):
+#             processedData = ut.RefineSalesOrderData(parsed_data[i])
+#             is_success = fill_sheet_bulk(processedData, SheetID=os.getenv("GOOGLE_SHEET_ID_SALES_ORDER"), header_row=8, sheet_name=SALES_ORDER_SHEET_NAME)
+#             print(f"Sheet {i} write success: {is_success}")
+#             if not is_success:
+#                 all_success = False
+
+#         if all_success:
+#             return Response({"success": True, "message": "Sales Order Uploaded Successfully"},status=status.HTTP_200_OK)
+#         return Response({"success": False, "message":"Some sheets failed to upload"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#     except Exception as e:
+#         import traceback
+#         traceback.print_exc()
+#         return Response({ "success": False, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(["POST"])
 def upload_excel(request):
-    try:
-        excel_file = request.FILES.get("file")
-        if not excel_file:
-            return Response({"success": False,"message": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
-
-        file_bytes = io.BytesIO(excel_file.read())
-        parsed_data = ut.process_excel(file_path=file_bytes)
-        all_success = True
-        # print(f"Parsed Excel Data: {parsed_data}")
-
-        for i in range(len(parsed_data)):
-            processedData = ut.RefineSalesOrderData(parsed_data[i])
-            is_success = fill_sheet_bulk(processedData, SheetID=os.getenv("GOOGLE_SHEET_ID_SALES_ORDER"), header_row=8, sheet_name=SALES_ORDER_SHEET_NAME)
-            print(f"Sheet {i} write success: {is_success}")
-            if not is_success:
-                all_success = False
-
-        if all_success:
-            return Response({"success": True, "message": "Sales Order Uploaded Successfully"},status=status.HTTP_200_OK)
-        return Response({"success": False, "message":"Some sheets failed to upload"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return Response({ "success": False, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({"failed": False, "message":"Some sheets failed to upload"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
