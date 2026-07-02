@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
 
   // const Backend_url = "https://invoice-scanner-7hgz.vercel.app/";        
   const Backend_url = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000/";
+  console.log("Backend_url is: ", import.meta.env.VITE_BACKEND_URL);
   
   // Check for existing token in localStorage on mount
   useEffect(() => {

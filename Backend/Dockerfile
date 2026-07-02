@@ -8,16 +8,18 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libglib2.0-0 \
-    libpango-1.0-0 \
     libcairo2 \
+    libpango-1.0-0 \
     libgdk-pixbuf-2.0-0 \
+    libglib2.0-0 \
     libffi-dev \
     libfontconfig1 \
     libharfbuzz-dev \
     libfreetype6 \
-    libjpeg-dev \
-    zlib1g-dev \
+    libjpeg62-turbo \
+    zlib1g \
+    shared-mime-info \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
@@ -29,4 +31,4 @@ RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "gunicorn Backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2"]
+CMD ["sh", "-c", "gunicorn Backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 600"]
