@@ -7,7 +7,6 @@ import os
 
 load_dotenv()
 
-
 def compress_image(base64_string: str, max_width: int = 1500, quality: int = 85):
     """
     Compress image while preserving OCR readability.
@@ -77,7 +76,7 @@ def bucket(base64_string: str, file_name: str = "inv"):
 
 
 def upload_pdf_buffer(pdf_buffer, file_name: str = "inv"):
-    print("PDF Upload called")
+    # print("PDF Upload called")
 
     imagekit = ImageKit(
         private_key=os.getenv("IMAGEKIT_PRIVATE_KEY")

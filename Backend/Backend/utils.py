@@ -1,22 +1,20 @@
 import pandas as pd
 import re
-# import requests
-# from pathlib import Path
-from django.conf import settings
+from pathlib import Path
 from rapidfuzz import fuzz
-# from jinja2 import Environment, BaseLoader
-# from jinja2 import Environment, FileSystemLoader
-import base64
+from datetime import datetime
+from jinja2 import Environment
+from jinja2 import Environment, FileSystemLoader
 import json
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 import os
 import io
 from dotenv import load_dotenv
-# from googleapiclient.http import MediaIoBaseUpload
-# from weasyprint import HTML
-from google.oauth2 import service_account
+from weasyprint import HTML
 from googleapiclient.discovery import build
-# from .bucketHandling import upload_pdf_buffer
-from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from .bucketHandling import upload_pdf_buffer
+from googleapiclient.http import MediaIoBaseDownload
 load_dotenv()
 
 def clean_value(value):
@@ -134,51 +132,57 @@ def extract_table(df, header_row):
 
 import tempfile
 
-# def generate_job_card_pdf(data: dict):
-#     template_dir = Path(__file__).resolve().parent / "template"
+def generate_job_card_pdf(data: dict):
+    template_dir = Path(__file__).resolve().parent / "template"
 
-#     temp_image_path = None
+    temp_image_path = None
 
-#     if data.get("ref_image"):
-#         image_buffer = data["ref_image"]
+    if data.get("ref_image"):
+        image_buffer = data["ref_image"]
 
-#         with tempfile.NamedTemporaryFile(
-#             suffix=".png",
-#             delete=False
-#         ) as temp_img:
-#             temp_img.write(image_buffer.getvalue())
-#             temp_image_path = temp_img.name
+        with tempfile.NamedTemporaryFile(
+            suffix=".png",
+            delete=False
+        ) as temp_img:
+            temp_img.write(image_buffer.getvalue())
+            temp_image_path = temp_img.name
 
-#         data["ref_image"] = f"file://{temp_image_path}"
+        data["ref_image"] = f"file://{temp_image_path}"
 
-#     env = Environment(
-#         loader=FileSystemLoader(template_dir),
-#         autoescape=True
-#     )
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=True
+    )
 
-#     rendered_html = env.get_template("jobcard.html").render(**data)
+    rendered_html = env.get_template("jobcard.html").render(**data)
 
-#     pdf_buffer = io.BytesIO()
+    pdf_buffer = io.BytesIO()
 
-#     HTML(
-#         string=rendered_html,
-#         base_url=str(template_dir)
-#     ).write_pdf(pdf_buffer)
+    HTML(
+        string=rendered_html,
+        base_url=str(template_dir)
+    ).write_pdf(pdf_buffer)
 
-#     pdf_buffer.seek(0)
+    pdf_buffer.seek(0)
 
-#     if temp_image_path and os.path.exists(temp_image_path):
-#         os.remove(temp_image_path)
+    if temp_image_path and os.path.exists(temp_image_path):
+        os.remove(temp_image_path)
 
-#     return pdf_buffer
+    return pdf_buffer
 
 
 def _drive_service():
-    credentials = service_account.Credentials.from_service_account_info(
-        json.loads(os.environ["GOOGLE_DRIVE_CREDENTIAL"]),
-        scopes=["https://www.googleapis.com/auth/drive"]
+    jsonCred=json.loads(os.getenv("GOOGLE_DRIVE_ACCESS"))
+    credentials = Credentials(
+        token=None,
+        refresh_token=jsonCred.get("refresh_token"),
+        token_uri=jsonCred.get("token_uri"),
+        client_id=jsonCred.get("client_id"),
+        client_secret=jsonCred.get("client_secret"),
+        scopes=["https://www.googleapis.com/auth/drive.readonly"]
     )
-
+    
+    credentials.refresh(Request())
     return build("drive", "v3", credentials=credentials)
 
 
@@ -221,61 +225,80 @@ def drive_image_to_buffer(drive_url: str):
         return None
 
 
-# def process_excel(file_path):
+def process_excel(file_path):
 
-#     excel = pd.ExcelFile(file_path)
-#     final_output = []
+    excel = pd.ExcelFile(file_path)
+    final_output = []
 
-#     for sheet_name in excel.sheet_names:
-#         print(f"\nProcessing Sheet: {sheet_name}")
+    for sheet_name in excel.sheet_names:
+        print(f"\nProcessing Sheet: {sheet_name}")
 
-#         raw_df = pd.read_excel(
-#             file_path,
-#             sheet_name=sheet_name,
-#             header=None
-#         )
+        raw_df = pd.read_excel(
+            file_path,
+            sheet_name=sheet_name,
+            header=None
+        )
 
-#         if raw_df.dropna(how="all").empty:
-#             print("Skipped Empty Sheet")
-#             continue
+        if raw_df.dropna(how="all").empty:
+            print("Skipped Empty Sheet")
+            continue
 
-#         header_row = detect_table_header(raw_df)
+        header_row = detect_table_header(raw_df)
 
-#         if header_row is None:
-#             print("No table found")
-#             continue
+        if header_row is None:
+            print("No table found")
+            continue
 
-#         print(f"Table detected at row {header_row}")
+        print(f"Table detected at row {header_row}")
 
-#         # Only read metadata above header row
-#         metadata = extract_metadata(
-#             raw_df.iloc[:header_row]
-#         )
+        # Only read metadata above header row
+        metadata = extract_metadata(
+            raw_df.iloc[:header_row]
+        )
 
-#         table_df = extract_table(
-#             raw_df,
-#             header_row
-#         )
+        table_df = extract_table(
+            raw_df,
+            header_row
+        )
 
-#         print("Detected Columns:")
-#         print(table_df.columns.tolist())
+        print("Detected Columns:")
+        print(table_df.columns.tolist())
 
-#         final_output.append(
-#             {
-#                 "sheet_name": sheet_name,
-#                 "metadata": metadata,
-#                 "table_data": table_df
-#             }
-#         )
+        final_output.append(
+            {
+                "sheet_name": sheet_name,
+                "metadata": metadata,
+                "table_data": table_df
+            }
+        )
 
-#     return final_output
+    return final_output
+
+import math
+import pandas as pd
+
+def sanitize(value, default=""):
+    """
+    Convert NaN, None, inf, -inf to a safe string/value for JSON.
+    """
+    if value is None:
+        return default
+
+    if pd.isna(value):
+        return default
+
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return default
+
+    return value
 
 
 def get_value(data, *keys):
     for key in keys:
         if key in data and data[key] not in [None, ""]:
             return data[key]
-    return None
+    return "NA"
 
 
 def clean_cell(value, default=""):
@@ -286,74 +309,78 @@ def clean_cell(value, default=""):
     return str(value).strip()
 
 
-# def RefineSalesOrderData(data):
-#     metadata = data["metadata"]
-#     table_data = data["table_data"]
-#     rows = []
+def RefineSalesOrderData(data):
+    metadata = data["metadata"]
+    table_data = data["table_data"]
+    rows = []
 
-#     # If table_data is DataFrame
-#     if isinstance(table_data, pd.DataFrame):
-#         table_data = table_data.to_dict(orient="records")
+    # If table_data is DataFrame
+    if isinstance(table_data, pd.DataFrame):
+        table_data = table_data.to_dict(orient="records")
 
-#     delivery_address = clean_cell(metadata.get("Delivery_Address")).replace("\n", " ").replace("\r", " ").strip()
-#     for item in table_data:
-#         product_name = str(item.get("PRODUCT_NAME")).strip().upper()
-#         model_number = str(item.get("MODEL_NUMBER")).strip().upper()
-#         rate_value = str(item.get("RATE", "")).strip().upper()
+    delivery_address = clean_cell(get_value(metadata, "Delivery_Address", "DELIVERY_ADDRESS")).replace("\n", " ").replace("\r", " ").strip()
+    for item in table_data:
+        product_name = str(item.get("PRODUCT_NAME")).strip().upper()
+        model_number = str(item.get("MODEL_NUMBER")).strip().upper()
+        rate_value = str(item.get("RATE", "")).strip().upper()
 
-#         # Skip summary rows
-#         if product_name in ["NAN", ""] or model_number in ["NAN", ""] or "TOTAL" in rate_value or "GST" in rate_value:
-#             continue
+        # Skip summary rows
+        if product_name in ["NAN", ""] or model_number in ["NAN", ""] or "TOTAL" in rate_value or "GST" in rate_value:
+            continue
 
-#         drive_url = item.get("LAYOUT_RENDER_URL")
-#         # Handle nan / None / non-string / empty values
-#         if pd.isna(drive_url) or not isinstance(drive_url, str) or not drive_url.strip():
-#             base64 = None
-#         else:
-#             try:
-#                 base64 = drive_image_to_buffer(drive_url=drive_url.strip())
-#             except Exception as e:
-#                 print(f"Error converting drive image to base64: {e}")
-#                 base64 = None
+        drive_url = item.get("RENDER_URL")
+        # Handle nan / None / non-string / empty values
+        if pd.isna(drive_url) or not isinstance(drive_url, str) or not drive_url.strip():
+            base64 = None
+        else:
+            try:
+                base64 = drive_image_to_buffer(drive_url=drive_url.strip())
+            except Exception as e:
+                print(f"Error converting drive image to base64: {e}")
+                base64 = None
 
-#         jobCardUrl = "NA"
-#         try:
-#             JobCard = generate_job_card_pdf(data={
-#                 "client_name": get_value(metadata, "Billing_Name", "BILLING_NAME"),
-#                 "po_number": get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO"),
-#                 "item_name": item.get("PRODUCT_NAME"),
-#                 "quantity": item.get("QUANTITY"),
-#                 "card_date": get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL"),
-#                 "Specifications": item.get("SPECIFICATIONS"),
-#                 "ref_image": base64
-#             })
-#             jobCardUrl = upload_pdf_buffer(pdf_buffer=JobCard)
-#         except Exception as e:
-#             print(f"Error generating/uploading Job Card for product {product_name}: {e}")
-#             jobCardUrl = f"Error: {e}"
+        jobCardUrl = "NA"
+        try:
+            JobCard = generate_job_card_pdf(data={
+                "client_name": get_value(metadata, "Billing_Name", "BILLING_NAME"),
+                "po_number": get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO"),
+                "item_name": item.get("PRODUCT_NAME"),
+                "quantity": item.get("QUANTITY"),
+                "card_date": get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL"),
+                "Specifications": item.get("SPECIFICATIONS"),
+                "ref_image": base64
+            })
+            jobCardUrl = upload_pdf_buffer(pdf_buffer=JobCard)
+        except Exception as e:
+            print(f"Error generating/uploading Job Card for product {product_name}: {e}")
+            jobCardUrl = f"Error: {e}"
 
-#         row = {
-#             "Billing_Name": get_value(metadata, "Billing_Name", "BILLING_NAME"),
-#             "Billing_Address": get_value(metadata, "Billing_Address", "BILLING_ADDRESS"),
-#             "GST": get_value(metadata, "GST"),
-#             "Delivery_Address": delivery_address,
-#             "RENDER_URL": clean_cell(item.get("RENDER_URL")),
-#             "PO_Num": get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO"),
-#             "PO_Valid_Till": get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL"),
-#             "Order_Type": get_value(metadata, "Order_Type", "ORDER_TYPE"),
-#             "Product_Name": clean_cell(item.get("PRODUCT_NAME")),
-#             "Model_Number": clean_cell(item.get("MODEL_NUMBER")),
-#             "QTY": clean_cell(item.get("QUANTITY")),
-#             "Rate": clean_cell(item.get("RATE")),
-#             "Total": clean_cell(item.get("TOTAL")),
-#             "Specifications": clean_cell(item.get("SPECIFICATIONS")),
-#             "LAYOUT_RENDER_URL": clean_cell(item.get("LAYOUT_RENDER_URL")),
-#             "UPHOLSTERY/STONE_FINISH": clean_cell(item.get("UPHOLSTERY/STONE_FINISH")).replace("\n", " ").replace("\r", " "),
-#             "CAD_urls": get_value(item, "CAD_urls", "CAD_URLS"),
-#             "Job_Card_Url": jobCardUrl
-#         }
-#         rows.append(row)
-#     return rows
+        row = {
+            "Billing_Name": sanitize(get_value(metadata, "Billing_Name", "BILLING_NAME")),
+            "Billing_Address": sanitize(get_value(metadata, "Billing_Address", "BILLING_ADDRESS")),
+            "GST": sanitize(get_value(metadata, "GST")),
+            "Delivery_Address": sanitize(delivery_address),
+            "RENDER_URL": sanitize(clean_cell(item.get("RENDER_URL", "NA"))),
+            "PO_Num": sanitize(get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO")),
+            "PO_Valid_Till": sanitize(get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL")),
+            "Order_Type": sanitize(get_value(metadata, "Order_Type", "ORDER_TYPE")),
+            "Product_Name": sanitize(clean_cell(item.get("PRODUCT_NAME"))),
+            "Model_Number": sanitize(clean_cell(item.get("MODEL_NUMBER"))),
+            "QTY": sanitize(clean_cell(item.get("QUANTITY"))),
+            "Rate": sanitize(clean_cell(item.get("RATE"))),
+            "Total": sanitize(clean_cell(item.get("TOTAL"))),
+            "Entry_Date": datetime.now().strftime("%d-%m-%Y"),
+            "Specifications": sanitize(clean_cell(item.get("SPECIFICATIONS", "NA"))),
+            "LAYOUT_RENDER_URL": sanitize(clean_cell(item.get("LAYOUT_RENDER_URL", "NA"))),
+            "UPHOLSTERY/STONE_FINISH": sanitize(
+                clean_cell(item.get("UPHOLSTERY/STONE_FINISH", "NA"))
+            ).replace("\n", " ").replace("\r", " "),
+            "CAD_urls": sanitize(get_value(item, "CAD_urls", "CAD_URLS")),
+            "Job_Card_Url": sanitize(jobCardUrl),
+            "pdf_url": sanitize(get_value(item, "pdf", "PDF"))
+        }
+        rows.append(row)
+    return rows
 
 
 

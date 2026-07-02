@@ -14,18 +14,29 @@
       background: #fff;
     }
 
-@page {
-    size: A4;
-    margin: 10mm;
-}
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
 
-.page {
-    width: auto;
-    min-height: auto;
-    margin: 0;
-    padding: 0;
-}
+    .page {
+        width: auto;
+        min-height: 35mm;
+        margin: 0;
+        padding: 0;
+    }
 
+    .description {
+        line-height: 5mm;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .desc-line {
+        border-bottom: 0.5pt dotted #999;
+        height: 5mm;
+    }
+    
     /* ── Header ── */
     .company-name {
       font-size: 8pt;
@@ -88,7 +99,7 @@
     }
 
     /* ── Reference image ── */
-    .image-wrap { margin-bottom: 3mm; }
+    .image-wrap { margin-bottom: 3mm; margin-left: 3mm;}
 
     .ref-img {
       display: block;
@@ -358,17 +369,28 @@
       <!-- Reference Image -->
       <div class="section-heading">Refrence Image/ CAD Drawing</div>
       <div class="image-wrap">
-        {%- if ref_image %}
-        <img class="ref-img" src="{{ ref_image }}" alt="Reference Image"/>
-        {%- endif %}
+          {% if ref_image %}
+              <img class="ref-img" src="{{ ref_image }}" alt="Reference Image">
+          {% else %}
+              <img class="ref-img" src="./noimage.jpg" alt="No Image Available">
+          {% endif %}
       </div>
 
       <!-- Product Description -->
       <div class="product-desc-box">
-        <div class="section-heading">Product Description</div>
-        <div class="description">
-            {{ Specifications }}
-        </div>
+          <div class="section-heading">Product Description</div>
+
+          {% if Specifications %}
+              <div class="description">
+                  {{ Specifications }}
+              </div>
+          {% endif %}
+
+          <div class="desc-line"></div>
+          <div class="desc-line"></div>
+          <div class="desc-line"></div>
+          <div class="desc-line"></div>
+          <div class="desc-line"></div>
       </div>
 
       <!-- Note + Signatures -->

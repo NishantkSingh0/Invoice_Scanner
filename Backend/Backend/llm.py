@@ -3,14 +3,20 @@ from urllib import response
 from groq import Groq
 from dotenv import load_dotenv
 import io
-import os
 import time
 import pandas as pd
-import re
-import google.generativeai as genai
-import json
-import base64
 load_dotenv()
+
+from google import genai
+from google.genai import types
+import base64
+import json
+import re
+import os
+
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
 
 from .static import Static
 
@@ -25,7 +31,6 @@ GROQ_KEYS = [
 # remove empty keys
 GROQ_KEYS = [k for k in GROQ_KEYS if k]
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # =========================
 # CREATE CLIENT
@@ -172,56 +177,51 @@ def llama4(
         )
 
 
-def gemini_inference(prompt, base64_image, content_type='image/jpeg', model="gemini-2.5-pro"):
-
+def gemini_inference(prompt, base64_image, content_type="image/jpeg", model="gemini-2.5-pro"):
     text = ""
+
     try:
-        model = genai.GenerativeModel(
-            model_name=model,
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0
-            },
-            system_instruction="""You are a Accountant who manages all purchase/Sales Records accurately
-            Extract the fields exactly as they appear in the document.
-                Do not infer missing values.
-                Do not verify calculations.
-                Do not perform audits.
-                Return only JSON."""
-        )
+        image_bytes = base64.b64decode(base64_image)
 
-        response = model.generate_content(
+        response = client.models.generate_content(
+            model=model,
             contents=[
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "mime_type": content_type,
-                            "data": base64_image
-                        },
-                        {
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=content_type,
+                ),
+                prompt
+            ],
+            config=types.GenerateContentConfig(
+                temperature=0,
+                response_mime_type="application/json",
+                system_instruction="""
+You are an accountant who manages all purchase and sales records accurately.
+
+Extract the fields exactly as they appear in the document.
+
+Do not infer missing values.
+Do not verify calculations.
+Do not perform audits.
+
+Return ONLY valid JSON.
+"""
+            )
         )
-
         text = response.text.strip()
-
         text = re.sub(r"^```json", "", text)
         text = re.sub(r"^```", "", text)
         text = re.sub(r"```$", "", text)
         text = text.strip()
 
         json.loads(text)
-
         return text
 
     except Exception as e:
         print("Gemini Error:", e)
-        print("Response Text:", text)
+        print("Response:", text)
         return "unable to parse"
+    
 
 def extract_bank_transactions(csv_source):
     """
@@ -359,27 +359,3 @@ def extract_bank_transactions(csv_source):
     records = final_df.to_dict(orient="records")
 
     return records
-
-
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-GeminiModel = genai.GenerativeModel("gemini-2.5-pro")
-
-def Gemini2Pro(prompt, base64_image, content_type='image/jpeg',):
-
-    image_bytes = base64.b64decode(base64_image)
-
-    response = GeminiModel.generate_content(
-        [
-            prompt,
-            {
-                "mime_type": content_type,
-                "data": image_bytes
-            }
-        ],
-        generation_config={
-            "response_mime_type": "application/json",
-            "temperature": 0
-        }
-    )
-
-    return response.text
