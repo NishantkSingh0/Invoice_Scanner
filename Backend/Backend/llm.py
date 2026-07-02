@@ -1,4 +1,6 @@
 from urllib import response
+from dateutil import parser
+
 
 from groq import Groq
 from dotenv import load_dotenv
@@ -264,6 +266,7 @@ def extract_bank_transactions(csv_source):
         engine="python",
         on_bad_lines="skip"
     )
+    print("Rows after read_csv:", len(df))
 
     # Clean dataframe
     df.columns = [str(col).strip() for col in df.columns]
@@ -277,17 +280,14 @@ def extract_bank_transactions(csv_source):
     amount_drcr_col = drcr_cols[0] if drcr_cols else None
 
     # Parse transaction dates
-    transaction_dates = pd.to_datetime(
-        df["Transaction Date"],
-        format="%d-%m-%Y %H:%M:%S",
-        errors="coerce"
-    )
+    def parse_date(value):
+        try:
+            return parser.parse(str(value), dayfirst=True)
+        except Exception:
+            return None
 
-    # Remove invalid dates first
-    valid_mask = transaction_dates.notna()
-
-    df = df[valid_mask].copy()
-    transaction_dates = transaction_dates[valid_mask]
+    transaction_dates = df["Transaction Date"].apply(parse_date)
+    print("Valid transaction dates:", len(transaction_dates))
 
     # Create final dataframe
     final_df = pd.DataFrame()
@@ -357,5 +357,6 @@ def extract_bank_transactions(csv_source):
 
     # Convert to records
     records = final_df.to_dict(orient="records")
+    print("records length is: ",len(records))
 
     return records
