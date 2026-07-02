@@ -31,9 +31,17 @@ DEBUG = os.getenv("DEBUG", "False").strip().lower() in ("true", "1", "yes")
 ALLOWED_HOSTS = [
     ".vercel.app",
     ".onrender.com",
+    ".railway.app",
     "localhost",
     "127.0.0.1",
 ]
+
+# Allow Railway's assigned host and any other proxy headers.
+if os.getenv("RAILWAY_PUBLIC_DOMAIN"):
+    ALLOWED_HOSTS.append(os.getenv("RAILWAY_PUBLIC_DOMAIN"))
+
+if os.getenv("HOSTNAME"):
+    ALLOWED_HOSTS.append(os.getenv("HOSTNAME"))
 
 # Application definition
 
@@ -131,7 +139,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
