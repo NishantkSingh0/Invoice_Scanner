@@ -9,6 +9,7 @@ import json
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 import os
+from zoneinfo import ZoneInfo
 import io
 from dotenv import load_dotenv
 from weasyprint import HTML
@@ -356,6 +357,7 @@ def RefineSalesOrderData(data):
             jobCardUrl = f"Error: {e}"
 
         row = {
+            "Updated_at": datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d/%b/%Y"),
             "Billing_Name": sanitize(get_value(metadata, "Billing_Name", "BILLING_NAME")),
             "Billing_Address": sanitize(get_value(metadata, "Billing_Address", "BILLING_ADDRESS")),
             "GST": sanitize(get_value(metadata, "GST")),
