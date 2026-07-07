@@ -102,7 +102,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                 GSTTOTAL = str(sum(map(float, re.findall(r'\d+(?:\.\d+)?', str(text))))) if re.findall(r'\d+(?:\.\d+)?', str(text)) else "NA"
                 if item["UNIT"].lower()== "null" and item["QUANTITY"].lower() == "null":
                     # print("Inside Frieght condition")
-                    Amount = item["ITEM_RATE"].replace(',','').replace('₹','').strip()
+                    Amount = itemRate
                 else:
                     Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
                 
