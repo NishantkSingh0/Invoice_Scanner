@@ -5,9 +5,15 @@ __pycache__/
 *.sqlite3
 *.log
 .env
+.env.*
 .venv/
 venv/
 .git/
 .gitignore
 .pytest_cache/
 .mypy_cache/
+staticfiles/
+.django_cache/
+.idea/
+.vscode/
+.DS_Store
