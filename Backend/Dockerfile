@@ -9,18 +9,16 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libcairo2 \
-    libpango-1.0-0 \
-    libgdk-pixbuf-2.0-0 \
     libglib2.0-0 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf-2.0-0 \
     libffi-dev \
     libfontconfig1 \
     libharfbuzz-dev \
     libfreetype6 \
-    libjpeg62-turbo \
-    zlib1g \
-    shared-mime-info \
-    fonts-dejavu-core \
+    libjpeg-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
