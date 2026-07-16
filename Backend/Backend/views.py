@@ -26,6 +26,7 @@ BANK_SHEET_NAME="Bank"
 # SALES_ORDER_SHEET_NAME="SalesOrder"
 SALES_ORDER_SHEET_NAME="WPR_BOT"
 MATERIAL_REQUISITION_SHEET="SalesRequisition"
+PO_REQUISITION_SHEET_NAME="PORequisition"
 
 def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
@@ -172,6 +173,62 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
     except Exception as e:
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message
+
+
+def process_po_requisition_image(base64_image, content_type, SheetID, sheet_name=PO_REQUISITION_SHEET_NAME, PageNum=None):
+    """Process PO requisition image or single PDF page and append rows to the PO requisition sheet."""
+    try:
+        print("Processing PO requisition image")
+        llm_response = gemini_inference(pr.PO_REQUISITION_PROMPT, base64_image, content_type)
+        if llm_response == "unable to parse":
+            raise ValueError("LLM failed to parse the PO requisition image. Check your API keys and model availability.")
+
+        output = json.loads(llm_response)
+        url = bucket(base64_string=base64_image)
+        assert output != "unable to parse", "Unable to parse PO requisition"
+        print("Parsing Succeed", output)
+
+        items = output.get("items") or []
+        if not isinstance(items, list) or len(items) == 0:
+            raise ValueError("No items found in PO requisition output")
+
+        success = True
+        for item in items:
+            try:
+                temp = {
+                    "ITEM_NAME": item.get("ITEM_NAME", "NA"),
+                    "QTY": item.get("QTY", "NA"),
+                    "UNIT": item.get("UNIT", "NA"),
+                    "PO_NO": output.get("PO_NO", "NA"),
+                    "RATE": item.get("RATE", "NA"),
+                    "PO_DATE": output.get("PO_DATE", "NA"),
+                    "VENDOR_NAME": output.get("VENDOR_NAME", "NA"),
+                    "Image_URL": url
+                }
+
+                print(f"calling fill_sheet to update Data, Sheet Name: {sheet_name}")
+                if not fill_sheet(temp, SheetID=SheetID, sheet_name=sheet_name, header_row=2):
+                    success = False
+                    print(f"Failed to fill sheet for PO requisition item: {item}")
+                    break
+            except Exception as e:
+                print(f"Error processing PO requisition item: {e}")
+                error_row = {
+                    "ITEM_NAME": item.get("ITEM_NAME", "NA"),
+                    "QTY": item.get("QTY", "NA"),
+                    "UNIT": item.get("UNIT", "NA"),
+                    "PO_NO": output.get("PO_NO", "NA"),
+                    "PO_DATE": output.get("PO_DATE", "NA"),
+                    "VENDOR_NAME": output.get("VENDOR_NAME", "NA"),
+                    "Image_URL": url
+                }
+                fill_sheet(error_row, SheetID=SheetID, sheet_name=sheet_name, header_row=2)
+                continue
+
+        return success
+    except Exception as e:
+        print(f"Error in process_po_requisition_image: {e}")
+        raise
 
 
 def process_Material_requisition(base64_image, content_type, SheetID, sheet_name):
@@ -403,13 +460,12 @@ def RenderMaterialRequisition(request):
         return JsonResponse({'error': 'No file provided'}, status=400)
 
     file = request.FILES['file']
-    image_data = file.read()
-    base64_image = base64.b64encode(image_data).decode('utf-8')
+    file_bytes = file.read()
+    base64_image = base64.b64encode(file_bytes).decode('utf-8')
     try:
         # Basic content-type guard (browsers may send text/csv or application/octet-stream)
         if file.name.lower().endswith('.pdf'):
-            pdf_bytes = file.read()
-            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
             total_pages = len(pdf_document)
             print(f"Total Pages: {total_pages}")
             all_success = True
@@ -435,6 +491,64 @@ def RenderMaterialRequisition(request):
         else:
             return JsonResponse({'error': 'Only PDF, JPG, JPEG Allowed files are accepted'}, status=400)
         
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
+
+
+@csrf_exempt
+def PORequisitionHandling(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+
+    file = request.FILES['file']
+    file_bytes = file.read()
+    try:
+        if file.name.lower().endswith('.pdf'):
+            pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
+            total_pages = len(pdf_document)
+            print(f"Total Pages: {total_pages}")
+            all_success = True
+            for page_index in range(total_pages):
+                print(f"Processing PO Requisition Page {page_index + 1}")
+                page = pdf_document.load_page(page_index)
+                matrix = fitz.Matrix(2, 2)
+                pix = page.get_pixmap(matrix=matrix)
+                image_bytes = pix.tobytes("png")
+                base64_image = base64.b64encode(image_bytes).decode("utf-8")
+                content_type = "image/png"
+                success = process_po_requisition_image(
+                    base64_image,
+                    content_type,
+                    SheetID=os.getenv('GOOGLE_SHEET_ID_PO_REQUISITION'),
+                    sheet_name=PO_REQUISITION_SHEET_NAME,
+                    PageNum=page_index + 1
+                )
+                if not success:
+                    all_success = False
+                    print(f"Failed on PO requisition page {page_index + 1}")
+
+            if all_success:
+                return JsonResponse({'success': True, 'message': 'PO Requisition processed successfully'})
+            return JsonResponse({'success': False, 'message': 'Some PO Requisition pages failed processing'}, status=500)
+
+        elif file.name.lower().endswith('.png') or file.name.lower().endswith('.jpg') or file.name.lower().endswith('.jpeg'):
+            base64_image = base64.b64encode(file_bytes).decode('utf-8')
+            success = process_po_requisition_image(
+                base64_image,
+                file.content_type,
+                SheetID=os.getenv('GOOGLE_SHEET_ID_PO_REQUISITION'),
+                sheet_name=PO_REQUISITION_SHEET_NAME
+            )
+            if success:
+                return JsonResponse({'success': True, 'message': 'PO Requisition processed successfully'})
+            return JsonResponse({'success': False, 'message': 'Failed to process PO Requisition image'}, status=500)
+
+        else:
+            return JsonResponse({'error': 'Only PDF, JPG, JPEG Allowed files are accepted'}, status=400)
+
     except Exception as e:
         return JsonResponse({'error': str(e), 'success': False}, status=500)
 
@@ -550,6 +664,9 @@ def render(request):
         elif key_name=="sales":
             print("Navigating to Sales")
             success = process_sales_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'), sheet_name=SALES_SHEET_NAME)
+        elif key_name=="PORequisition":
+            print("Navigating to PO Requisition")
+            success = process_po_requisition_image(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_PO_REQUISITION'), sheet_name=PO_REQUISITION_SHEET_NAME)
         else:
             return JsonResponse({'error': 'Wrong KeyName provided'}, status=500)
         

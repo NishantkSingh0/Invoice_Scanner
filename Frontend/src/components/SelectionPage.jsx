@@ -37,6 +37,12 @@ export default function SelectionPage() {
       title: 'Material Requisition',
       description: 'Process Material Requisition documents',
       color: 'bg-orange-500 hover:bg-orange-600'
+    },
+    {
+      id: 'PORequisition',
+      title: 'PO Requisition',
+      description: 'Process PO Requisition documents',
+      color: 'bg-black/80 hover:bg-black'
     }
   ]
 

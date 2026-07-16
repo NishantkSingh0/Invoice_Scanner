@@ -19,6 +19,7 @@ export default function UploadImage() {
   const isBank = key_name === "bank";
   const isSalesOrder = key_name === "SalesOrder";
   const isMaterialRequisition = key_name === "MaterialRequisition";
+  const isPORequisition = key_name === "PORequisition";
 
   // const Backend_url = "https://invoice-scanner-7hgz.vercel.app/";        
   const Backend_url = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000/";
@@ -56,6 +57,31 @@ export default function UploadImage() {
 
     // Material Requisition Validation
     if (isMaterialRequisition) {
+
+      const validTypes = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/jpg"
+      ];
+
+      const fileName = selected.name.toLowerCase();
+      const isValidType = validTypes.includes(selected.type) || 
+                          fileName.endsWith('.pdf') ||
+                          fileName.endsWith('.png') ||
+                          fileName.endsWith('.jpeg') ||
+                          fileName.endsWith('.jpg');
+
+      if (!isValidType) {
+
+        toast.error("Only PDF, PNG, JPEG, JPG files allowed ❌");
+
+        return;
+      }
+    }
+
+    // PO Requisition Validation
+    if (isPORequisition) {
 
       const validTypes = [
         "application/pdf",
@@ -143,11 +169,10 @@ export default function UploadImage() {
 
     formData.append("file", file);
 
-    if (!isBank && !isSalesOrder && !isMaterialRequisition) {
+    if (!isBank && !isSalesOrder && !isMaterialRequisition && !isPORequisition) {
 
       formData.append(
-        "KeyName",
-        key_name || ""
+        "KeyName", key_name || ""
       );
     }
 
@@ -169,6 +194,12 @@ export default function UploadImage() {
     else if (isMaterialRequisition) {
 
       endpoint = `${Backend_url}Material-Requisition/`;
+    }
+
+    // PO Requisition
+    else if (isPORequisition) {
+
+      endpoint = `${Backend_url}PORequisition/`;
     }
 
     // PDF
@@ -209,9 +240,11 @@ export default function UploadImage() {
             ? "Sales Order Rendered Successfully ✅"
             : isMaterialRequisition
               ? "Material Requisition Rendered Successfully ✅"
-              : file.type === "application/pdf"
-                ? "PDF Rendered Successfully ✅"
-                : "Image Rendered Successfully ✅"
+              : isPORequisition
+                ? "PO Requisition Rendered Successfully ✅"
+                : file.type === "application/pdf"
+                  ? "PDF Rendered Successfully ✅"
+                  : "Image Rendered Successfully ✅"
       );
 
       setFile(null);
@@ -229,9 +262,11 @@ export default function UploadImage() {
             ? "Failed To Upload Sales Order ❌"
             : isMaterialRequisition
               ? "Failed To Upload Material Requisition ❌"
-              : file.type === "application/pdf"
-                ? "Failed To Upload PDF ❌"
-                : "Failed To Upload Image ❌"
+              : isPORequisition
+                ? "Failed To Upload PO Requisition ❌"
+                : file.type === "application/pdf"
+                  ? "Failed To Upload PDF ❌"
+                  : "Failed To Upload Image ❌"
       );
 
     } finally {
@@ -357,7 +392,9 @@ export default function UploadImage() {
               ? "Upload Sales Order XLSX"
               : isMaterialRequisition
                 ? "Upload Material Requisition"
-                : <>Upload or Capture Image/PDF of <br /> ({key_name} invoice)</>
+                : isPORequisition
+                  ? "Upload PO Requisition"
+                  : <>Upload or Capture Image/PDF of <br /> ({key_name} invoice)</>
           }
 
         </h1>
@@ -371,7 +408,9 @@ export default function UploadImage() {
               ? ".xlsx"
               : isMaterialRequisition
                 ? ".pdf,.png,.jpeg,.jpg,image/png,image/jpeg,application/pdf"
-                : "image/*,.pdf,application/pdf"
+                : isPORequisition
+                  ? ".pdf,.png,.jpeg,.jpg,image/png,image/jpeg,application/pdf"
+                  : "image/*,.pdf,application/pdf"
           }
           onChange={handleFileChange}
           onClick={(e) => { e.target.value = null; }}
@@ -413,7 +452,9 @@ export default function UploadImage() {
                 ? "Upload XLSX"
                 : isMaterialRequisition
                   ? "Upload File"
-                  : "Upload Image / PDF"
+                  : isPORequisition
+                    ? "Upload File"
+                    : "Upload Image / PDF"
             }
 
           </button>

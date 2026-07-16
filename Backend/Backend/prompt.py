@@ -67,6 +67,42 @@ FINAL RULE
 Return ONLY pure valid JSON."""
 
 
+PO_REQUISITION_PROMPT="""You are an Account Manager, Read Purchase Order Requisition documents clearly and extract required fields accurately.
+
+Extract These ACCURATELY from the document in this exact JSON format:
+
+{
+  "PO_NO": "",
+  "PO_DATE": "",
+  "VENDOR_NAME": "",
+  "items": [
+    {
+      "ITEM_NAME": "",
+      "QTY": "",
+      "RATE": "",
+      "UNIT": ""
+    }
+  ]
+}
+
+SMART FIELD MAPPING
+- PO_NO: Purchase order number written on the document OR (Voucher No).
+- PO_DATE: Purchase order date.
+- VENDOR_NAME: Vendor name exactly as shown (Name Except CRAFTED OAK & ORE PRIVATE LIMITED).
+- ITEM_NAME: Product name or item description exactly as shown.
+- QTY: Quantity/Amount of product.
+- RATE: Rate of the product per piece.
+- UNIT: Unit of Product.
+
+ITEM RULES
+1. Include every listed item in the document.
+2. If only one item appears, still return it inside the items array.
+3. If a value is missing, return "NA" rather than inventing information.
+
+FINAL RULE
+Return ONLY pure valid JSON."""
+
+
 MATERIAL_REQUISITION_PROMPT="""You are an Account Manager, Read Material Requisition Forms Clearly, And Keep balance Accurate.
 
 Extract These ACCURATELY from Invoices
