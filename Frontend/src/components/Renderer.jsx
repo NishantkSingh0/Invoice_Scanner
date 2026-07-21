@@ -7,6 +7,7 @@ export default function UploadImage() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [jobProgress, setJobProgress] = useState({ total: 0, processed: 0, status: '' });
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -157,6 +158,44 @@ export default function UploadImage() {
   };
 
   // ─────────────────────────────────────────────
+  // Poll job status
+  // ─────────────────────────────────────────────
+  const pollJobStatus = async (jobId) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`${Backend_url}job-status/${jobId}/`);
+        const data = await response.json();
+        
+        setJobProgress({
+          total: data.total_pages,
+          processed: data.processed_pages,
+          status: data.status
+        });
+
+        if (data.status === 'completed') {
+          clearInterval(pollInterval);
+          setLoading(false);
+          toast.success("PDF Rendered Successfully ✅");
+          setFile(null);
+          setPreview(null);
+          setJobProgress({ total: 0, processed: 0, status: '' });
+        } else if (data.status === 'failed') {
+          clearInterval(pollInterval);
+          setLoading(false);
+          toast.error(`Failed To Upload PDF: ${data.error_message || 'Unknown error'} ❌`);
+          setJobProgress({ total: 0, processed: 0, status: '' });
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+        clearInterval(pollInterval);
+        setLoading(false);
+        toast.error("Failed To Upload PDF ❌");
+        setJobProgress({ total: 0, processed: 0, status: '' });
+      }
+    }, 2000); // Poll every 2 seconds
+  };
+
+  // ─────────────────────────────────────────────
   // Upload
   // ─────────────────────────────────────────────
   const handleSend = async () => {
@@ -232,6 +271,14 @@ export default function UploadImage() {
         );
       }
 
+      // If PDF upload, start polling for job status
+      if (file.type === "application/pdf" && data.job_id) {
+        setJobProgress({ total: 0, processed: 0, status: 'pending' });
+        pollJobStatus(data.job_id);
+        return;
+      }
+
+      // For non-PDF uploads, show immediate success
       toast.success(
 
         isBank
@@ -242,13 +289,12 @@ export default function UploadImage() {
               ? "Material Requisition Rendered Successfully ✅"
               : isPORequisition
                 ? "PO Requisition Rendered Successfully ✅"
-                : file.type === "application/pdf"
-                  ? "PDF Rendered Successfully ✅"
-                  : "Image Rendered Successfully ✅"
+                : "Image Rendered Successfully ✅"
       );
 
       setFile(null);
       setPreview(null);
+      setLoading(false);
 
     } catch (error) {
 
@@ -268,8 +314,6 @@ export default function UploadImage() {
                   ? "Failed To Upload PDF ❌"
                   : "Failed To Upload Image ❌"
       );
-
-    } finally {
 
       setLoading(false);
     }
@@ -523,17 +567,25 @@ export default function UploadImage() {
         >
 
           {loading ? (
-
-            <div className="flex items-center gap-2">
-
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-
-              Rendering... Visit Sheet,
-
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                {jobProgress.total > 0 ? (
+                  <span>Processing: {jobProgress.processed}/{jobProgress.total} pages</span>
+                ) : (
+                  <span>Starting processing...</span>
+                )}
+              </div>
+              {jobProgress.total > 0 && (
+                <div className="w-full bg-gray-300 rounded-full h-2 mt-1">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(jobProgress.processed / jobProgress.total) * 100}%` }}
+                  />
+                </div>
+              )}
             </div>
-
           ) : (
-
             "Send"
           )}
         </button>

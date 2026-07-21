@@ -16,6 +16,7 @@ from .llm import llama4, extract_bank_transactions, gemini_inference
 from . import utils as ut
 from . import prompt as pr
 from .sheet import fill_sheet, fill_sheet_bulk
+from .tasks import start_pdf_processing
 import secrets
 from datetime import datetime, timedelta
 from .bucketHandling import bucket
@@ -28,6 +29,66 @@ SALES_ORDER_SHEET_NAME="WPR_BOT"
 MATERIAL_REQUISITION_SHEET="SalesRequisition"
 PO_REQUISITION_SHEET_NAME="PORequisition"
 
+def _to_str(value, default="NA"):
+    """
+    Coerce a single field from the LLM's JSON invoice response into the
+    plain string this pipeline expects everywhere else.
+ 
+    Root cause of both bugs you're seeing:
+      - The LLM sometimes emits JSON `null` for a field (-> Python `None`)
+        instead of the string "NA"/"NULL" the prompt asks for.
+            -> item['ITEM_RATE'].replace(...) then blows up with
+               "'NoneType' object has no attribute 'replace'"
+      - The LLM sometimes emits a bare JSON number (e.g. 9 or 9.0) for a
+        field like QUANTITY / CGST / SGST / ITEM_RATE / DISCOUNT instead
+        of a string.
+            -> item['CGST'].strip() then blows up with
+               "'int' object has no attribute 'strip'"
+ 
+    Normalizing every field to a string immediately after json.loads()
+    means none of the arithmetic/formatting logic further down has to
+    change — it simply never sees a non-string value again.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        # keep "9" instead of "9.0" when the LLM sends a whole-number float,
+        # matching the plain-string format the rest of the code expects
+        return str(int(value)) if value.is_integer() else str(value)
+    return value
+
+
+def _normalize_invoice_output(output):
+    """
+    Walk the parsed LLM JSON (top-level invoice fields + every item row)
+    and coerce every field this pipeline touches with string methods into
+    an actual string, in place. Call this once right after json.loads().
+    """
+    for field in ("VENDOR_NAME", "GSTIN/UIN", "INVOICE_NO", "INVOICE_DATE", "GRDATE", "PO_NO"):
+        if field in output:
+            output[field] = _to_str(output[field])
+ 
+    for item in output.get('items', []):
+        for field in (
+            "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER",
+            "LEDGER_ACCOUNT",
+            "QUANTITY",
+            "UNIT",
+            "ITEM_RATE",
+            "DISCOUNT",
+            "HSN/SAC",
+            "CGST",
+            "SGST",
+        ):
+            if field in item:
+                item[field] = _to_str(item[field])
+ 
+    return output
+ 
 def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
     if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15 or not json_Data['GSTIN/UIN'].strip()[:2].isdigit() or json_Data['GSTIN/UIN'].replace(" ", "")[2:7].isdigit():
@@ -57,6 +118,7 @@ def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     return list(set(columns))
 
 
+ 
 def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCHASE_SHEET_NAME, PageNum=None):
     """
     Processes the base64 image using LLM and fills the Google Sheet.
@@ -79,10 +141,17 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
         url=bucket(base64_string=base64_image)
         assert output != "unable to parse", "Unable to parse invoice"
         print("Parsing Succeed",output)
-
+ 
+        # --- Defensive normalization -------------------------------------
+        # Prevents "'NoneType' object has no attribute 'replace'" and
+        # "'int' object has no attribute 'strip'" crashes below, without
+        # changing any of the calculation logic itself.
+        output = _normalize_invoice_output(output)
+ 
         success = True
         ProductCounts=len(output['items'])
         GSTNum, vendorname=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
+        GSTNum, vendorname = _to_str(GSTNum), _to_str(vendorname)
         preRegisteredCells=[]
         for item in output['items']:
             try: 
@@ -110,7 +179,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                 CGSTamount=(float(item['CGST'].replace("NA","0").replace('%','').replace(' ',''))/100)*float(Amount.replace("NA","0")) if item['CGST'].strip() !="NULL" else "NULL"
                 SGSTamount=(float(item['SGST'].replace("NA","0").replace('%','').replace(' ',''))/100)*float(Amount.replace("NA","0")) if item['CGST'].strip() !="NULL" else "NULL"
                 # print(CGSTamount, SGSTamount, Amount, GSTTOTAL)
-
+ 
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
@@ -173,7 +242,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
     except Exception as e:
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message
-
+ 
 
 def process_po_requisition_image(base64_image, content_type, SheetID, sheet_name=PO_REQUISITION_SHEET_NAME, PageNum=None):
     """Process PO requisition image or single PDF page and append rows to the PO requisition sheet."""
@@ -326,10 +395,17 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
         output = json.loads(llm_response)
         assert output != "unable to parse", "Unable to parse invoice"
         # print("Parsing Succeed",output)
-
+ 
+        # --- Defensive normalization -------------------------------------
+        # Prevents "'NoneType' object has no attribute 'replace'" and
+        # "'int' object has no attribute 'strip'" crashes below, without
+        # changing any of the calculation logic itself.
+        output = _normalize_invoice_output(output)
+ 
         success = True
         ProductCounts=len(output['items'])
         GSTNum, vendorname=ut.find_gst_by_vendor(output['VENDOR_NAME'], output['GSTIN/UIN'])
+        GSTNum, vendorname = _to_str(GSTNum), _to_str(vendorname)
         preRegisteredCells=[]
         for item in output['items']:
             try: 
@@ -353,8 +429,8 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     Amount = item["ITEM_RATE"].replace(',','').replace('₹','').strip()
                 else:
                     Amount = str(float(str(item['QUANTITY'].split(" ")[0]).strip().replace("'", ".").replace(',','')) * float(str(DiscountedRate))) if not str(item['QUANTITY'].split(" ")[0]).strip().replace(',','').startswith("NA") and not str(DiscountedRate).strip().startswith("NA") else "NA"
-
-
+ 
+ 
                 temp = {
                     "MONTH": re.split(r"[-/]", output['INVOICE_DATE'])[1] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 1 else "NA",
                     "FY": re.split(r"[-/]", output['INVOICE_DATE'])[2] if len(re.split(r"[-/]", output['INVOICE_DATE'])) > 2 else "NA",
@@ -415,7 +491,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
     except Exception as e:
         print(f"Error in process_image: {e}")
         raise  # Re-raise so the view can return a meaningful error message
-
+ 
 
 @csrf_exempt
 def render_csv(request):
@@ -568,67 +644,63 @@ def render_pdf(request):
     key_name = request.POST.get("KeyName")
 
     try:
-
         pdf_bytes = file.read()
-
-        # Open PDF from memory
-        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-        total_pages = len(pdf_document)
-        print(f"Total Pages: {total_pages}")
-        all_success = True
-        for page_index in range(total_pages):
-
-            print(f"Processing Page {page_index + 1}")
-            page = pdf_document.load_page(page_index)
-            # Increase quality if needed
-            matrix = fitz.Matrix(2, 2)
-            pix = page.get_pixmap(matrix=matrix)
-            # Convert page image to bytes
-            image_bytes = pix.tobytes("png")
-            # Base64 encode
-            base64_image = base64.b64encode(image_bytes).decode("utf-8")
-            content_type = "image/png"
-            # Process page
-            if key_name == "purchase":
-
-                print("Navigating to Purchase")
-                
-                success = process_purchase_image(
-                    base64_image,
-                    content_type,
-                    SheetID=os.getenv('GOOGLE_SHEET_ID_PURCHASE'),
-                    sheet_name=PURCHASE_SHEET_NAME,
-                    PageNum=page_index + 1
-                )
-
-            elif key_name == "sales":
-                print("Navigating to Sales")
-                success = process_sales_image(
-                    base64_image,
-                    content_type,
-                    SheetID=os.getenv('GOOGLE_SHEET_ID_SALES'),
-                    sheet_name=SALES_SHEET_NAME
-                )
-
-            else:
-                return JsonResponse(
-                    {'error': 'Wrong KeyName provided'},
-                    status=500
-                )
-
-            if not success:
-                all_success = False
-                print(f"Failed on page {page_index + 1}")
-
-        pdf_document.close()
-        if all_success:
-            return JsonResponse({"success": True, "message": "Image processed and sheet updated successfully"})
-
+        
+        # Generate job ID
+        job_id = secrets.token_hex(16)
+        
+        # Initialize job in cache
+        cache.set(f"pdf_job_{job_id}", {
+            'status': 'pending',
+            'total_pages': 0,
+            'processed_pages': 0,
+            'error_message': None,
+            'created_at': datetime.now().isoformat(),
+        }, timeout=3600)  # 1 hour timeout
+        
+        # Start background processing
+        start_pdf_processing(job_id, pdf_bytes, key_name)
+        
         return JsonResponse({
             "success": True,
-            "message": 'Some pages failed processing'
-        }, status=500)
+            "message": "PDF processing started in background",
+            "job_id": job_id
+        })
 
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def job_status(request, job_id):
+    """
+    Endpoint to check the status of a PDF rendering job.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        job_data = cache.get(f"pdf_job_{job_id}")
+        
+        if not job_data:
+            return JsonResponse({'error': 'Job not found'}, status=404)
+        
+        response_data = {
+            'job_id': job_id,
+            'status': job_data['status'],
+            'total_pages': job_data['total_pages'],
+            'processed_pages': job_data['processed_pages'],
+            'created_at': job_data['created_at'],
+        }
+        
+        if 'completed_at' in job_data:
+            response_data['completed_at'] = job_data['completed_at']
+        
+        if job_data.get('error_message'):
+            response_data['error_message'] = job_data['error_message']
+        
+        return JsonResponse(response_data)
+    
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
