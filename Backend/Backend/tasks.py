@@ -6,7 +6,7 @@ from django.core.cache import cache
 from datetime import datetime
 
 
-def process_pdf_background(job_id, pdf_bytes, key_name):
+def process_pdf_background(job_id, pdf_bytes, key_name, start_page=1):
     """
     Background task to process PDF pages asynchronously.
     This function runs in a separate thread to avoid timeout.
@@ -19,6 +19,7 @@ def process_pdf_background(job_id, pdf_bytes, key_name):
         'status': 'processing',
         'total_pages': 0,
         'processed_pages': 0,
+        'start_page': start_page,
         'error_message': None,
         'created_at': datetime.now().isoformat(),
     }, timeout=3600)  # 1 hour timeout
@@ -28,15 +29,18 @@ def process_pdf_background(job_id, pdf_bytes, key_name):
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
         total_pages = len(pdf_document)
         
+        # Adjust start_page to 0-based index
+        start_index = max(0, start_page - 1)
+        
         # Update total pages
         job_data = cache.get(f"pdf_job_{job_id}")
         job_data['total_pages'] = total_pages
         cache.set(f"pdf_job_{job_id}", job_data, timeout=3600)
         
-        print(f"Starting background processing for job {job_id} with {total_pages} pages")
+        print(f"Starting background processing for job {job_id} from page {start_page} to {total_pages}")
         
         all_success = True
-        for page_index in range(total_pages):
+        for page_index in range(start_index, total_pages):
             print(f"Processing Page {page_index + 1}/{total_pages} for job {job_id}")
             
             page = pdf_document.load_page(page_index)
@@ -69,9 +73,9 @@ def process_pdf_background(job_id, pdf_bytes, key_name):
                 all_success = False
                 print(f"Failed on page {page_index + 1} for job {job_id}")
             
-            # Update progress
+            # Update progress (relative to start_page)
             job_data = cache.get(f"pdf_job_{job_id}")
-            job_data['processed_pages'] = page_index + 1
+            job_data['processed_pages'] = page_index - start_index + 1
             cache.set(f"pdf_job_{job_id}", job_data, timeout=3600)
         
         pdf_document.close()
@@ -99,13 +103,13 @@ def process_pdf_background(job_id, pdf_bytes, key_name):
         print(f"Job {job_id} failed with error: {e}")
 
 
-def start_pdf_processing(job_id, pdf_bytes, key_name):
+def start_pdf_processing(job_id, pdf_bytes, key_name, start_page=1):
     """
     Start PDF processing in a background thread.
     """
     thread = threading.Thread(
         target=process_pdf_background,
-        args=(job_id, pdf_bytes, key_name),
+        args=(job_id, pdf_bytes, key_name, start_page),
         daemon=True
     )
     thread.start()

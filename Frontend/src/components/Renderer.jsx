@@ -7,7 +7,9 @@ export default function UploadImage() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [jobProgress, setJobProgress] = useState({ total: 0, processed: 0, status: '' });
+  const [jobProgress, setJobProgress] = useState({ total: 0, processed: 0, status: '', start_page: 1 });
+  const [startPage, setStartPage] = useState(1);
+  const [failedPage, setFailedPage] = useState(null);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -169,7 +171,8 @@ export default function UploadImage() {
         setJobProgress({
           total: data.total_pages,
           processed: data.processed_pages,
-          status: data.status
+          status: data.status,
+          start_page: data.start_page || startPage
         });
 
         if (data.status === 'completed') {
@@ -178,19 +181,22 @@ export default function UploadImage() {
           toast.success("PDF Rendered Successfully ✅");
           setFile(null);
           setPreview(null);
-          setJobProgress({ total: 0, processed: 0, status: '' });
+          setJobProgress({ total: 0, processed: 0, status: '', start_page: 1 });
+          setFailedPage(null);
         } else if (data.status === 'failed') {
           clearInterval(pollInterval);
           setLoading(false);
-          toast.error(`Failed To Upload PDF: ${data.error_message || 'Unknown error'} ❌`);
-          setJobProgress({ total: 0, processed: 0, status: '' });
+          const failedAt = (data.start_page || startPage) + data.processed_pages;
+          setFailedPage(failedAt);
+          toast.error(`Failed at page ${failedAt}: ${data.error_message || 'Unknown error'} ❌`);
+          setJobProgress({ total: 0, processed: 0, status: '', start_page: 1 });
         }
       } catch (error) {
         console.error("Polling error:", error);
         clearInterval(pollInterval);
         setLoading(false);
         toast.error("Failed To Upload PDF ❌");
-        setJobProgress({ total: 0, processed: 0, status: '' });
+        setJobProgress({ total: 0, processed: 0, status: '', start_page: 1 });
       }
     }, 2000); // Poll every 2 seconds
   };
@@ -213,6 +219,11 @@ export default function UploadImage() {
       formData.append(
         "KeyName", key_name || ""
       );
+    }
+
+    // Add start_page for PDF uploads
+    if (file.type === "application/pdf" || isMaterialRequisition || isPORequisition) {
+      formData.append("start_page", startPage.toString());
     }
 
     let endpoint = "";
@@ -275,6 +286,29 @@ export default function UploadImage() {
       if (file.type === "application/pdf" && data.job_id) {
         setJobProgress({ total: 0, processed: 0, status: 'pending' });
         pollJobStatus(data.job_id);
+        return;
+      }
+
+      // For Material Requisition and PO Requisition PDFs (synchronous)
+      if ((isMaterialRequisition || isPORequisition) && file.type === "application/pdf") {
+        if (data.success) {
+          toast.success(
+            isMaterialRequisition
+              ? "Material Requisition Rendered Successfully ✅"
+              : "PO Requisition Rendered Successfully ✅"
+          );
+          setFile(null);
+          setPreview(null);
+          setFailedPage(null);
+        } else {
+          setFailedPage(null); // These endpoints don't return page info, so we can't show specific page
+          toast.error(
+            isMaterialRequisition
+              ? "Failed To Upload Material Requisition ❌"
+              : "Failed To Upload PO Requisition ❌"
+          );
+        }
+        setLoading(false);
         return;
       }
 
@@ -542,6 +576,28 @@ export default function UploadImage() {
                   }
 
                 </p>
+
+                {/* Start Page Input for PDF */}
+                {preview === "PDF" && (
+                  <div className="mt-4 w-full">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Start from page:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={startPage}
+                      onChange={(e) => setStartPage(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={loading}
+                    />
+                    {failedPage && (
+                      <p className="text-xs text-orange-600 mt-1">
+                        Last failed at page {failedPage}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
             ) : (
@@ -571,7 +627,7 @@ export default function UploadImage() {
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 {jobProgress.total > 0 ? (
-                  <span>Processing: {jobProgress.processed}/{jobProgress.total} pages</span>
+                  <span>Processing: {jobProgress.processed}/{jobProgress.total - (jobProgress.start_page - 1)} pages (from page {jobProgress.start_page})</span>
                 ) : (
                   <span>Starting processing...</span>
                 )}
@@ -580,11 +636,13 @@ export default function UploadImage() {
                 <div className="w-full bg-gray-300 rounded-full h-2 mt-1">
                   <div 
                     className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(jobProgress.processed / jobProgress.total) * 100}%` }}
+                    style={{ width: `${(jobProgress.processed / (jobProgress.total - (jobProgress.start_page - 1))) * 100}%` }}
                   />
                 </div>
               )}
             </div>
+          ) : failedPage ? (
+            `Failed at page ${failedPage} - Retry`
           ) : (
             "Send"
           )}

@@ -536,6 +536,7 @@ def RenderMaterialRequisition(request):
         return JsonResponse({'error': 'No file provided'}, status=400)
 
     file = request.FILES['file']
+    start_page = int(request.POST.get("start_page", "1"))
     file_bytes = file.read()
     base64_image = base64.b64encode(file_bytes).decode('utf-8')
     try:
@@ -543,9 +544,10 @@ def RenderMaterialRequisition(request):
         if file.name.lower().endswith('.pdf'):
             pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
             total_pages = len(pdf_document)
-            print(f"Total Pages: {total_pages}")
+            start_index = max(0, start_page - 1)
+            print(f"Total Pages: {total_pages}, Starting from page: {start_page}")
             all_success = True
-            for page_index in range(total_pages):
+            for page_index in range(start_index, total_pages):
                 print(f"Processing Page {page_index + 1}")
                 page = pdf_document.load_page(page_index)
                 matrix = fitz.Matrix(2, 2)
@@ -580,14 +582,16 @@ def PORequisitionHandling(request):
         return JsonResponse({'error': 'No file provided'}, status=400)
 
     file = request.FILES['file']
+    start_page = int(request.POST.get("start_page", "1"))
     file_bytes = file.read()
     try:
         if file.name.lower().endswith('.pdf'):
             pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
             total_pages = len(pdf_document)
-            print(f"Total Pages: {total_pages}")
+            start_index = max(0, start_page - 1)
+            print(f"Total Pages: {total_pages}, Starting from page: {start_page}")
             all_success = True
-            for page_index in range(total_pages):
+            for page_index in range(start_index, total_pages):
                 print(f"Processing PO Requisition Page {page_index + 1}")
                 page = pdf_document.load_page(page_index)
                 matrix = fitz.Matrix(2, 2)
@@ -642,6 +646,7 @@ def render_pdf(request):
 
     file = request.FILES['file']
     key_name = request.POST.get("KeyName")
+    start_page = request.POST.get("start_page", "1")
 
     try:
         pdf_bytes = file.read()
@@ -659,7 +664,7 @@ def render_pdf(request):
         }, timeout=3600)  # 1 hour timeout
         
         # Start background processing
-        start_pdf_processing(job_id, pdf_bytes, key_name)
+        start_pdf_processing(job_id, pdf_bytes, key_name, int(start_page))
         
         return JsonResponse({
             "success": True,
