@@ -140,7 +140,7 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
         output = json.loads(llm_response)
         url=bucket(base64_string=base64_image)
         assert output != "unable to parse", "Unable to parse invoice"
-        print("Parsing Succeed",output)
+        # print("Parsing Succeed",output)
  
         # --- Defensive normalization -------------------------------------
         # Prevents "'NoneType' object has no attribute 'replace'" and
@@ -441,7 +441,7 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                     "INVOICE_DATE": output['INVOICE_DATE'],
                     "GSTIN/UIN": GSTNum,
                     "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": item['ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER'].upper(),
-                    "LEDGER_ACCOUNT": item['LEDGER_ACCOUNT'],
+                    "LEDGER_ACCOUNT": "SALES" if item['LEDGER_ACCOUNT'].strip() == "PURCHASE" else item['LEDGER_ACCOUNT'],
                     "QTY": item['QUANTITY'],
                     "UNIT": item['UNIT'],
                     "ITEM_RATE": itemRate  if item["UNIT"].lower()!= "null" and item["ITEM_RATE"].lower() !="null" else "NULL",
