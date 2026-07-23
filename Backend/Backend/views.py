@@ -93,7 +93,7 @@ def detectAnomalyCells(json_Data, ProductCounts, preRegisteredCells=[]):
     columns=preRegisteredCells
     if SequenceMatcher(None, json_Data['GSTIN/UIN'], '09AAMCC1953B1ZS').ratio() >0.9 or len(json_Data['GSTIN/UIN']) != 15 or not json_Data['GSTIN/UIN'].strip()[:2].isdigit() or json_Data['GSTIN/UIN'].replace(" ", "")[2:7].isdigit():
         columns.append("GSTIN/UIN")
-    if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8:
+    if SequenceMatcher(None, json_Data['VENDOR_NAME'][:17], 'Crafted Oak & Ore'[:17]).ratio() > 0.8 or json_Data['VENDOR_NAME'][:17].lower().strip()=="crafted oak and ore private limited":
         columns.append("VENDOR_NAME")
     if ProductCounts>12:
         columns.append("ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER")
