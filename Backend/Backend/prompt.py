@@ -43,7 +43,7 @@ for FREIGHT/INSURANCE/LABOUR/TRANSPORTATION/OTHER SERVICE CHARGES Return Item de
 SMART FIELD MAPPING
 - (List all products even if it is 15, MISSING OF ANY SINGLE PRODUCT BECOME A VERY SERIOUS PROBLEM, Fetch Their Details Accurately & ROW-WISE, NO LAZINESS, NO SHORTCUTS),
 - The QUANTITY And UnitRate SHOULD BE 100% ACCURATE,
-- “VENDOR_NAME”: The supplier/seller/company issuing the invoice, NEVER BE `Crafted Oak & Ore Pvt Ltd`
+- “VENDOR_NAME”: The supplier/seller/company issuing the invoice, NEVER RETURN `Crafted Oak & Ore Pvt Ltd` HERE!!!! BECAUSE IT IS NOT VENDOR NAME
 - "CGST" / "SGST"   (Should be in Percentage Only (% RATE ONLY)) If field is Blurry.. Try to Read Accurately
     If only IGST/GST percentage is present:
       CGST = IGST% / 2
