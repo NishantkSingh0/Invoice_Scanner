@@ -325,9 +325,6 @@ def RefineSalesOrderData(data):
         model_number = str(item.get("MODEL_NUMBER")).strip().upper()
         rate_value = str(item.get("RATE", "")).strip().upper()
 
-        # Skip summary rows
-        if product_name in ["NAN", ""] or model_number in ["NAN", ""] or "TOTAL" in rate_value or "GST" in rate_value:
-            continue
 
         drive_url = item.get("RENDER_URL")
         # Handle nan / None / non-string / empty values
@@ -345,10 +342,10 @@ def RefineSalesOrderData(data):
             JobCard = generate_job_card_pdf(data={
                 "client_name": get_value(metadata, "Billing_Name", "BILLING_NAME"),
                 "po_number": get_value(metadata, "Purchase_Order_No", "PURCHASE_ORDER_NO"),
-                "item_name": item.get("PRODUCT_NAME"),
-                "quantity": item.get("QUANTITY"),
+                "item_name": item.get("PRODUCT_NAME",""),
+                "quantity": item.get("QUANTITY",""),
                 "card_date": get_value(metadata, "PO_Valid_Till", "PO_VALID_TILL"),
-                "Specifications": item.get("SPECIFICATIONS"),
+                "Specifications": item.get("SPECIFICATIONS",""),
                 "ref_image": base64
             })
             jobCardUrl = upload_pdf_buffer(pdf_buffer=JobCard)
