@@ -30,8 +30,8 @@ for FREIGHT/INSURANCE/LABOUR/TRANSPORTATION/OTHER SERVICE CHARGES Return Item de
 {
   "ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER": "",   (Charges Name)
   "LEDGER_ACCOUNT": "SERVICE CHARGES",   
-  "QUANTITY": "NULL",        
-  "UNIT": "NULL",            
+  "QUANTITY": "1",        
+  "UNIT": "Charge Amount here!! in rupees",            
   "ITEM_RATE": "Charge Amount here!! in rupees",
   "DISCOUNT": "NULL",        
   "HSN/SAC": "NULL",
