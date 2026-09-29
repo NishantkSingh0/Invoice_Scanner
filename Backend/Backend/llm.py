@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import io
 import time
 import pandas as pd
+import gc
 load_dotenv()
 
 from google import genai
@@ -124,7 +125,13 @@ def llama4(
 
         client = get_client(current_index)
 
-        image_data_url = f"data:{content_type};base64,{base64_image}"
+        # Accept either base64 string or pre-decoded bytes
+        if isinstance(base64_image, str):
+            image_data_url = f"data:{content_type};base64,{base64_image}"
+        else:
+            # If bytes are passed, encode to base64
+            encoded = base64.b64encode(base64_image).decode('utf-8')
+            image_data_url = f"data:{content_type};base64,{encoded}"
 
         completion = client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
@@ -183,7 +190,11 @@ def gemini_inference(prompt, base64_image, content_type="image/jpeg", model="gem
     text = ""
 
     try:
-        image_bytes = base64.b64decode(base64_image)
+        # Accept either base64 string or pre-decoded bytes to avoid redundant decoding
+        if isinstance(base64_image, str):
+            image_bytes = base64.b64decode(base64_image)
+        else:
+            image_bytes = base64_image
 
         response = client.models.generate_content(
             model=model,
@@ -217,11 +228,22 @@ Return ONLY valid JSON.
         text = text.strip()
 
         json.loads(text)
+        
+        # Clean up image bytes
+        image_bytes = None
+        del image_bytes
+        gc.collect()
+        
         return text
 
     except Exception as e:
         print("Gemini Error:", e)
         print("Response:", text)
+        # Clean up on error
+        if 'image_bytes' in locals():
+            image_bytes = None
+            del image_bytes
+            gc.collect()
         return "unable to parse"
     
 
@@ -358,5 +380,11 @@ def extract_bank_transactions(csv_source):
     # Convert to records
     records = final_df.to_dict(orient="records")
     print("records length is: ",len(records))
+    
+    # Clean up DataFrames to free memory
+    df = None
+    final_df = None
+    del df, final_df
+    gc.collect()
 
     return records

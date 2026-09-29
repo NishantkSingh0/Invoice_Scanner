@@ -2,6 +2,7 @@ import threading
 import base64
 import os
 import fitz
+import gc
 from django.core.cache import cache
 from datetime import datetime
 
@@ -44,11 +45,17 @@ def process_pdf_background(job_id, pdf_bytes, key_name, start_page=1):
             print(f"Processing Page {page_index + 1}/{total_pages} for job {job_id}")
             
             page = pdf_document.load_page(page_index)
-            matrix = fitz.Matrix(2, 2)
+            # Use lower DPI (1.5 instead of 2.0) to reduce memory by ~44%
+            matrix = fitz.Matrix(1.5, 1.5)
             pix = page.get_pixmap(matrix=matrix)
             image_bytes = pix.tobytes("png")
             base64_image = base64.b64encode(image_bytes).decode("utf-8")
             content_type = "image/png"
+            
+            # Explicit cleanup of page and pixmap to free memory
+            page = None
+            pix = None
+            del page, pix
             
             # Process page based on key_name
             if key_name == "purchase":
@@ -69,6 +76,11 @@ def process_pdf_background(job_id, pdf_bytes, key_name, start_page=1):
             else:
                 raise ValueError(f"Invalid key_name: {key_name}")
             
+            # Clean up base64 string to free memory
+            base64_image = None
+            image_bytes = None
+            del base64_image, image_bytes
+            
             if not success:
                 all_success = False
                 print(f"Failed on page {page_index + 1} for job {job_id}")
@@ -77,6 +89,10 @@ def process_pdf_background(job_id, pdf_bytes, key_name, start_page=1):
             job_data = cache.get(f"pdf_job_{job_id}")
             job_data['processed_pages'] = page_index - start_index + 1
             cache.set(f"pdf_job_{job_id}", job_data, timeout=3600)
+            
+            # Force garbage collection every 5 pages to free memory
+            if (page_index - start_index + 1) % 5 == 0:
+                gc.collect()
         
         pdf_document.close()
         
@@ -94,6 +110,10 @@ def process_pdf_background(job_id, pdf_bytes, key_name, start_page=1):
             print(f"Job {job_id} completed with some failures")
             
     except Exception as e:
+        # Ensure PDF document is closed even on error
+        if 'pdf_document' in locals():
+            pdf_document.close()
+        
         # Mark as failed
         job_data = cache.get(f"pdf_job_{job_id}")
         job_data['status'] = 'failed'
@@ -101,6 +121,9 @@ def process_pdf_background(job_id, pdf_bytes, key_name, start_page=1):
         job_data['completed_at'] = datetime.now().isoformat()
         cache.set(f"pdf_job_{job_id}", job_data, timeout=3600)
         print(f"Job {job_id} failed with error: {e}")
+        
+        # Force garbage collection on error
+        gc.collect()
 
 
 def start_pdf_processing(job_id, pdf_bytes, key_name, start_page=1):

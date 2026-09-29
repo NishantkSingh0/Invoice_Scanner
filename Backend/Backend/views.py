@@ -6,6 +6,7 @@ import re
 import fitz  # pymupdf
 from difflib import SequenceMatcher
 import io
+import gc
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -141,6 +142,9 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
         url=bucket(base64_string=base64_image)
         assert output != "unable to parse", "Unable to parse invoice"
         # print("Parsing Succeed",output)
+        
+        # Clean up base64_image after upload to free memory
+        # Note: We keep the URL reference for the sheet
  
         # --- Defensive normalization -------------------------------------
         # Prevents "'NoneType' object has no attribute 'replace'" and
@@ -238,9 +242,13 @@ def process_purchase_image(base64_image, content_type, SheetID, sheet_name=PURCH
                 _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["MONTH","FY","GR_DATE","VENDOR_NAME","PO_NO","INVOICE_NO","INVOICE_DATE","GSTIN/UIN","ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER","LEDGER_ACCOUNT","QTY","UNIT","ITEM_RATE","AMOUNT","DISCOUNT","HSN/SAC","CGST","SGST","IGST","TOTAL_TAX","TOTAL_AMOUNT"])
                 print(f"Error processing item: {e}")
                 continue
+        # Force garbage collection after processing
+        gc.collect()
         return success
     except Exception as e:
         print(f"Error in process_image: {e}")
+        # Force garbage collection on error
+        gc.collect()
         raise  # Re-raise so the view can return a meaningful error message
  
 
@@ -294,9 +302,12 @@ def process_po_requisition_image(base64_image, content_type, SheetID, sheet_name
                 fill_sheet(error_row, SheetID=SheetID, sheet_name=sheet_name, header_row=2)
                 continue
 
+        # Force garbage collection after processing
+        gc.collect()
         return success
     except Exception as e:
         print(f"Error in process_po_requisition_image: {e}")
+        gc.collect()
         raise
 
 
@@ -344,6 +355,9 @@ def process_Material_requisition(base64_image, content_type, SheetID, sheet_name
         }
         _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["Department_Name","Date","Product_Name","Quantity","Unit","Last_purchased_price","Stock_in_Hand","Vendor_Name","IsApproved","url"])
         print(f"Error processing item: {e}")
+    
+    # Force garbage collection after processing
+    gc.collect()
     return success
 
 
@@ -366,10 +380,15 @@ def process_bank_csv(file_bytes, SheetID):
 
         if not records:
             raise ValueError("No transaction records extracted from CSV")
-        return fill_sheet_bulk(records, SheetID=SheetID, sheet_name=BANK_SHEET_NAME, header_row=2)
+        result = fill_sheet_bulk(records, SheetID=SheetID, sheet_name=BANK_SHEET_NAME, header_row=2)
+        
+        # Force garbage collection after processing
+        gc.collect()
+        return result
 
     except Exception as e:
         print(f"Error in process_bank_csv: {e}")
+        gc.collect()
         raise
 
 
@@ -487,9 +506,13 @@ def process_sales_image(base64_image, content_type, SheetID, sheet_name=SALES_SH
                 _=fill_sheet(tempxvc, SheetID=SheetID, sheet_name=sheet_name, header_row=2, highlight_columns=["MONTH","FY","GR_DATE","VENDOR_NAME","PO_NO","INVOICE_NO","INVOICE_DATE","GSTIN/UIN","ITEM_DESCRIPTION_AS_PER_INVOICE_OF_SUPPLIER","LEDGER_ACCOUNT","QTY","UNIT","ITEM_RATE","AMOUNT","DISCOUNT","HSN/SAC","CGST","SGST","IGST","TOTAL_TAX","TOTAL_AMOUNT"])
                 print(f"Error processing item: {e}")
                 continue
+        # Force garbage collection after processing
+        gc.collect()
         return success
     except Exception as e:
         print(f"Error in process_image: {e}")
+        # Force garbage collection on error
+        gc.collect()
         raise  # Re-raise so the view can return a meaningful error message
  
 
@@ -550,15 +573,38 @@ def RenderMaterialRequisition(request):
             for page_index in range(start_index, total_pages):
                 print(f"Processing Page {page_index + 1}")
                 page = pdf_document.load_page(page_index)
-                matrix = fitz.Matrix(2, 2)
+                # Use lower DPI (1.5 instead of 2.0) to reduce memory
+                matrix = fitz.Matrix(1.5, 1.5)
                 pix = page.get_pixmap(matrix=matrix)
                 image_bytes = pix.tobytes("png")
                 base64_image = base64.b64encode(image_bytes).decode("utf-8")
                 content_type = "image/png"
+                
+                # Explicit cleanup of page and pixmap
+                page = None
+                pix = None
+                del page, pix
+                
                 success = process_Material_requisition(base64_image, content_type, SheetID=os.getenv('GOOGLE_SHEET_ID_MATERIAL_REQUISITION'), sheet_name=MATERIAL_REQUISITION_SHEET)
+                
+                # Clean up base64 to free memory
+                base64_image = None
+                image_bytes = None
+                del base64_image, image_bytes
+                
                 if not success:
                     all_success = False
                     print(f"Failed on page {page_index + 1}")
+                
+                # Force garbage collection every 5 pages
+                if (page_index - start_index + 1) % 5 == 0:
+                    gc.collect()
+            
+            # Close PDF document
+            pdf_document.close()
+            pdf_document = None
+            del pdf_document
+            gc.collect()
             
             return JsonResponse({'success': all_success, 'message': 'Material Requisition processed successfully'})
 
@@ -594,11 +640,18 @@ def PORequisitionHandling(request):
             for page_index in range(start_index, total_pages):
                 print(f"Processing PO Requisition Page {page_index + 1}")
                 page = pdf_document.load_page(page_index)
-                matrix = fitz.Matrix(2, 2)
+                # Use lower DPI (1.5 instead of 2.0) to reduce memory
+                matrix = fitz.Matrix(1.5, 1.5)
                 pix = page.get_pixmap(matrix=matrix)
                 image_bytes = pix.tobytes("png")
                 base64_image = base64.b64encode(image_bytes).decode("utf-8")
                 content_type = "image/png"
+                
+                # Explicit cleanup of page and pixmap
+                page = None
+                pix = None
+                del page, pix
+                
                 success = process_po_requisition_image(
                     base64_image,
                     content_type,
@@ -606,9 +659,25 @@ def PORequisitionHandling(request):
                     sheet_name=PO_REQUISITION_SHEET_NAME,
                     PageNum=page_index + 1
                 )
+                
+                # Clean up base64 to free memory
+                base64_image = None
+                image_bytes = None
+                del base64_image, image_bytes
+                
                 if not success:
                     all_success = False
                     print(f"Failed on PO requisition page {page_index + 1}")
+                
+                # Force garbage collection every 5 pages
+                if (page_index - start_index + 1) % 5 == 0:
+                    gc.collect()
+            
+            # Close PDF document
+            pdf_document.close()
+            pdf_document = None
+            del pdf_document
+            gc.collect()
 
             if all_success:
                 return JsonResponse({'success': True, 'message': 'PO Requisition processed successfully'})
@@ -883,6 +952,19 @@ def upload_excel(request):
             print(f"Sheet {i} write success: {is_success}")
             if not is_success:
                 all_success = False
+            
+            # Clean up processed data to free memory
+            processedData = None
+            del processedData
+            gc.collect()
+
+        # Clean up parsed data
+        parsed_data = None
+        del parsed_data
+        file_bytes.close()
+        file_bytes = None
+        del file_bytes
+        gc.collect()
 
         if all_success:
             return Response({"success": True, "message": "Sales Order Uploaded Successfully"},status=status.HTTP_200_OK)

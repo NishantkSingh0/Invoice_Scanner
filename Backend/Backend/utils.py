@@ -11,6 +11,7 @@ from google.oauth2.credentials import Credentials
 import os
 from zoneinfo import ZoneInfo
 import io
+import gc
 from dotenv import load_dotenv
 from weasyprint import HTML
 from googleapiclient.discovery import build
@@ -194,6 +195,9 @@ def drive_image_to_buffer(drive_url: str):
     if not drive_url or not isinstance(drive_url, str):
         return None
 
+    service = None
+    buffer = None
+    
     try:
         service = _drive_service()
 
@@ -223,7 +227,15 @@ def drive_image_to_buffer(drive_url: str):
 
     except Exception as e:
         print(f"Error in drive_image_to_buffer: {e}")
+        if buffer:
+            buffer.close()
         return None
+    finally:
+        # Clean up service object
+        if service:
+            service = None
+            del service
+            gc.collect()
 
 
 def process_excel(file_path):
@@ -242,12 +254,18 @@ def process_excel(file_path):
 
         if raw_df.dropna(how="all").empty:
             print("Skipped Empty Sheet")
+            # Clean up DataFrame
+            raw_df = None
+            del raw_df
             continue
 
         header_row = detect_table_header(raw_df)
 
         if header_row is None:
             print("No table found")
+            # Clean up DataFrame
+            raw_df = None
+            del raw_df
             continue
 
         print(f"Table detected at row {header_row}")
@@ -272,6 +290,17 @@ def process_excel(file_path):
                 "table_data": table_df
             }
         )
+        
+        # Clean up DataFrames after processing each sheet
+        raw_df = None
+        del raw_df
+        gc.collect()
+
+    # Clean up Excel object
+    excel.close()
+    excel = None
+    del excel
+    gc.collect()
 
     return final_output
 
@@ -349,9 +378,20 @@ def RefineSalesOrderData(data):
                 "ref_image": base64
             })
             jobCardUrl = upload_pdf_buffer(pdf_buffer=JobCard)
+            
+            # Clean up job card buffer after upload
+            JobCard.close()
+            JobCard = None
+            del JobCard
         except Exception as e:
             print(f"Error generating/uploading Job Card for product {product_name}: {e}")
             jobCardUrl = f"Error: {e}"
+        
+        # Clean up base64 image buffer after use
+        if base64:
+            base64.close()
+            base64 = None
+            del base64
 
         row = {
             "Updated_at": datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d/%b/%Y"),
@@ -379,6 +419,13 @@ def RefineSalesOrderData(data):
             "pdf_url": sanitize(get_value(item, "pdf", "PDF"))
         }
         rows.append(row)
+    
+    # Clean up table_data and metadata to free memory
+    table_data = None
+    metadata = None
+    del table_data, metadata
+    gc.collect()
+    
     return rows
 
 

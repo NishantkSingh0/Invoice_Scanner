@@ -18,7 +18,7 @@ Extract These ACCURATELY from Invoices
       "QUANTITY": "",         (Accuracy require! RECHECK)
       "UNIT": "",            
       "ITEM_RATE": "",        (Per Unit Cost of Product, Accuracy require! RECHECK)
-      "DISCOUNT": "",         (in Percentage only, If not mentioned. keep it NA)
+      "DISCOUNT": "",         (in Percentage only, If not mentioned then only keep it NA)
       "HSN/SAC": "",       (Accuracy require!)
       "CGST": "",         (Accuracy require!)
       "SGST": ""         (Accuracy require!)

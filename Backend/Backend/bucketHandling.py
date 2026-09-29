@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO
 import base64
 import os
+import gc
 
 load_dotenv()
 
@@ -11,38 +12,44 @@ def compress_image(base64_string: str, max_width: int = 1500, quality: int = 85)
     """
     Compress image while preserving OCR readability.
     Returns BytesIO object ready for upload.
+    Optimized to minimize memory copies.
     """
 
+    # Decode base64 directly to bytes
     image_bytes = base64.b64decode(base64_string)
 
-    img = Image.open(BytesIO(image_bytes))
+    # Use BytesIO as context manager for automatic cleanup
+    with BytesIO(image_bytes) as input_buffer:
+        img = Image.open(input_buffer)
 
-    # Convert transparent images to RGB
-    if img.mode in ("RGBA", "P"):
-        img = img.convert("RGB")
+        # Convert transparent images to RGB
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
 
-    # Resize only if image is too large
-    if img.width > max_width:
-        ratio = max_width / img.width
-        new_height = int(img.height * ratio)
+        # Resize only if image is too large
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
 
-        img = img.resize(
-            (max_width, new_height),
-            Image.LANCZOS
+            img = img.resize(
+                (max_width, new_height),
+                Image.LANCZOS
+            )
+
+        output = BytesIO()
+
+        img.save(
+            output,
+            format="JPEG",
+            quality=quality,
+            optimize=True
         )
 
-    output = BytesIO()
+        # Close image to free memory
+        img.close()
+        output.seek(0)
 
-    img.save(
-        output,
-        format="JPEG",
-        quality=quality,
-        optimize=True
-    )
-
-    output.seek(0)
-
-    return output
+        return output
 
 
 def bucket(base64_string: str, file_name: str = "inv"):
